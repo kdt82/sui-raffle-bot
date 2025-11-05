@@ -32,3 +32,19 @@ export async function requireAdmin(
   await callback();
 }
 
+export async function requireAdminCallback(
+  query: TelegramBot.CallbackQuery,
+  callback: () => Promise<void>
+): Promise<void> {
+  const userId = BigInt(query.from.id);
+  logger.info(`Checking admin status for callback from Telegram user ID: ${userId}`);
+  if (!(await isAdmin(userId))) {
+    await bot.answerCallbackQuery(query.id, {
+      text: '❌ Admin access required',
+      show_alert: true,
+    });
+    return;
+  }
+  await callback();
+}
+

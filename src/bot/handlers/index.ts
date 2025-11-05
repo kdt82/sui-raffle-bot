@@ -6,7 +6,7 @@ import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
 import { handleBackupCommand, handleBackupListCommand, handleBackupDownloadCommand, handleBackupRestoreCommand, handleBackupRaffleCommand, handleBackupCleanupCommand } from './backup';
-import { requireAdmin } from '../middleware';
+import { requireAdmin, requireAdminCallback } from '../middleware';
 import { conversationManager } from '../conversation';
 import { withCallbackRateLimit } from '../rate-limit-middleware';
 
@@ -82,7 +82,7 @@ export function registerAdminHandlers(): void {
           callbackData === 'cancel_create_raffle' ||
           callbackData.startsWith('back_to_')) {
         await withCallbackRateLimit(query, 'callback_ui', async () => {
-          await requireAdmin(query.message!, async () => {
+          await requireAdminCallback(query, async () => {
             await handleCreateRaffleCallback(query);
           });
         });
