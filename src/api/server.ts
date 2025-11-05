@@ -1,6 +1,6 @@
 import fastify from 'fastify';
-import { logger } from './utils/logger';
-import { registerHealthRoutes } from './api/health';
+import { logger } from '../utils/logger';
+import { registerHealthRoutes } from './health';
 
 const PORT = parseInt(process.env.PORT || '3000');
 

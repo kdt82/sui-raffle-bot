@@ -350,9 +350,6 @@ export class AnalyticsService {
   async getRaffleComparison(): Promise<any> {
     try {
       const raffleAnalytics = await prisma.raffleAnalytics.findMany({
-        include: {
-          raffleId: true,
-        },
         orderBy: {
           createdAt: 'desc',
         },

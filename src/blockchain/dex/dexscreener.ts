@@ -46,7 +46,7 @@ export class DexScreenerIntegration implements DexIntegration {
     try {
       // Fetch token pair data from DexScreener
       const response = await fetch(`${DEXSCREENER_API_URL}/tokens/${tokenAddress}`);
-      const data = await response.json();
+      const data: any = await response.json();
 
       if (data.pairs && data.pairs.length > 0) {
         // Get recent transactions from pairs
