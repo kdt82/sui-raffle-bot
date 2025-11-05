@@ -229,13 +229,31 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
     return;
   }
 
-  const endTime = new Date(endTimeStr);
-  if (isNaN(endTime.getTime())) {
+  // Parse DD/MM/YYYY HH:mm:ss format
+  const dateTimeRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/;
+  const match = endTimeStr.match(dateTimeRegex);
+  
+  if (!match) {
     await bot.sendMessage(
       chatId,
-      '❌ Invalid date format. Please use: YYYY-MM-DDTHH:mm:ss\n\n' +
-      'Example: 2024-12-31T23:59:59'
+      '❌ Invalid format. Please use: DD/MM/YYYY HH:mm:ss (UTC)\n\n' +
+      'Example: 31/12/2024 23:59:59'
     );
+    return;
+  }
+
+  const [, day, month, year, hours, minutes, seconds] = match;
+  const endTime = new Date(Date.UTC(
+    parseInt(year),
+    parseInt(month) - 1, // Month is 0-indexed
+    parseInt(day),
+    parseInt(hours),
+    parseInt(minutes),
+    parseInt(seconds)
+  ));
+
+  if (isNaN(endTime.getTime())) {
+    await bot.sendMessage(chatId, '❌ Invalid date. Please check your input.');
     return;
   }
 
