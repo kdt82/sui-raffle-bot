@@ -1,5 +1,9 @@
 import { getRedisClient } from './redis';
 import { logger } from './logger';
+import { Registry, Counter, Gauge, Histogram } from 'prom-client';
+
+// Create a Registry
+export const register = new Registry();
 
 /**
  * Simple metrics tracking using Redis
