@@ -18,7 +18,7 @@ export const logger = {
   warn: (msg: string, ...args: any[]) => pinoLogger.warn(msg, ...args),
   error: (msg: string, error?: any) => {
     if (error) {
-      pinoLogger.error({ err: error }, msg);
+      pinoLogger.error(msg, error);
     } else {
       pinoLogger.error(msg);
     }
