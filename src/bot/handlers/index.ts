@@ -1,5 +1,5 @@
 import { bot } from '../index';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand } from './user';
 import { handleCreateRaffle, handleSetPrize, handleUploadMedia, handleAwardPrize, handleConfig } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';

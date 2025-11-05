@@ -1,12 +1,12 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
-import { prisma } from '../utils/database';
-import { logger } from '../utils/logger';
-import { RAFFLE_STATUS } from '../utils/constants';
+import { prisma } from '../../utils/database';
+import { logger } from '../../utils/logger';
+import { RAFFLE_STATUS } from '../../utils/constants';
 import { withRateLimit } from '../rate-limit-middleware';
-import { RATE_LIMITS } from '../utils/rate-limiter';
-import { incrementCommand } from '../utils/metrics';
-import { analyticsService } from '../services/analytics-service';
+import { RATE_LIMITS } from '../../utils/rate-limiter';
+import { incrementCommand } from '../../utils/metrics';
+import { analyticsService } from '../../services/analytics-service';
 
 export async function handleStartCommand(msg: TelegramBot.Message): Promise<void> {
   return withRateLimit(msg, 'start', RATE_LIMITS.USER_COMMAND, async () => {

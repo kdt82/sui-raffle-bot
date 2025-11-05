@@ -1,8 +1,8 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
-import { prisma } from '../utils/database';
-import { logger } from '../utils/logger';
-import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS } from '../utils/constants';
+import { prisma } from '../../utils/database';
+import { logger } from '../../utils/logger';
+import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS } from '../../utils/constants';
 import { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
 import { conversationManager } from '../conversation';
 

@@ -2,7 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
 import { resetUserRateLimit } from '../rate-limit-middleware';
 import { requireAdmin } from '../middleware';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
 
 // Add this to your admin handlers registration
 

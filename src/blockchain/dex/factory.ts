@@ -1,5 +1,5 @@
-import { logger } from '../utils/logger';
-import { DexType } from '../utils/constants';
+import { logger } from '../../utils/logger';
+import { DexType } from '../../utils/constants';
 import { DexIntegration, BuyEventData } from './base';
 import { CetusIntegration } from './cetus';
 import { TurbosIntegration } from './turbos';
