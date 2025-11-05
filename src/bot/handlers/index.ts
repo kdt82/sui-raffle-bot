@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleUploadMedia, handleAwardPrize, handleConfig } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';

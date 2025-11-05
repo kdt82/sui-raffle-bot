@@ -16,6 +16,7 @@ export const DEX_NAMES = {
 export const RAFFLE_STATUS = {
   ACTIVE: 'active',
   ENDED: 'ended',
+  CANCELLED: 'cancelled',
   WINNER_SELECTED: 'winner_selected',
 } as const;
 

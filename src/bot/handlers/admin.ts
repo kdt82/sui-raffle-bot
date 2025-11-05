@@ -9,6 +9,48 @@ import { conversationManager } from '../conversation';
 // Re-export UI handler
 export { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
 
+export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+
+  try {
+    // Find active raffle
+    const activeRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: RAFFLE_STATUS.ACTIVE,
+      },
+    });
+
+    if (!activeRaffle) {
+      await bot.sendMessage(chatId, '❌ No active raffle to cancel.');
+      return;
+    }
+
+    // Update raffle status to ended (or we could add a 'cancelled' status)
+    await prisma.raffle.update({
+      where: { id: activeRaffle.id },
+      data: { 
+        status: 'cancelled',
+        updatedAt: new Date(),
+      },
+    });
+
+    await bot.sendMessage(
+      chatId,
+      `✅ Raffle Cancelled Successfully!\n\n` +
+      `Raffle ID: ${activeRaffle.id}\n` +
+      `Contract: ${activeRaffle.contractAddress.slice(0, 10)}...${activeRaffle.contractAddress.slice(-6)}\n` +
+      `DEX: ${activeRaffle.dexType.toUpperCase()}\n` +
+      `Prize: ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}\n\n` +
+      `The raffle has been cancelled and buy detection has stopped.`
+    );
+
+    logger.info(`Raffle cancelled: ${activeRaffle.id}`);
+  } catch (error) {
+    logger.error('Error cancelling raffle:', error);
+    await bot.sendMessage(chatId, '❌ Failed to cancel raffle. Please try again.');
+  }
+}
+
 export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void> {
   const chatId = msg.chat.id;
   const userId = BigInt(msg.from!.id);
