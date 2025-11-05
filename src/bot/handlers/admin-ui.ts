@@ -224,6 +224,8 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
   const userId = BigInt(msg.from!.id);
   const endTimeStr = msg.text?.trim();
 
+  logger.info(`Received date input: "${endTimeStr}"`);
+
   if (!endTimeStr) {
     await bot.sendMessage(chatId, '❌ Please send a valid end time.');
     return;
@@ -233,16 +235,21 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
   const dateTimeRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/;
   const match = endTimeStr.match(dateTimeRegex);
   
+  logger.info(`Regex match result: ${match ? 'SUCCESS' : 'FAILED'}`);
+  
   if (!match) {
     await bot.sendMessage(
       chatId,
-      '❌ Invalid format. Please use: DD/MM/YYYY HH:mm:ss (UTC)\n\n' +
-      'Example: 31/12/2024 23:59:59'
+      `❌ Invalid format. Please use: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
+      `Example: 31/12/2024 23:59:59\n\n` +
+      `You sent: "${endTimeStr}"`
     );
     return;
   }
 
   const [, day, month, year, hours, minutes, seconds] = match;
+  logger.info(`Parsed values - Day: ${day}, Month: ${month}, Year: ${year}, Time: ${hours}:${minutes}:${seconds}`);
+  
   const endTime = new Date(Date.UTC(
     parseInt(year),
     parseInt(month) - 1, // Month is 0-indexed
@@ -252,13 +259,15 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
     parseInt(seconds)
   ));
 
+  logger.info(`Parsed date: ${endTime.toISOString()}, Valid: ${!isNaN(endTime.getTime())}, Future: ${endTime > new Date()}`);
+
   if (isNaN(endTime.getTime())) {
     await bot.sendMessage(chatId, '❌ Invalid date. Please check your input.');
     return;
   }
 
   if (endTime <= new Date()) {
-    await bot.sendMessage(chatId, '❌ End time must be in the future.');
+    await bot.sendMessage(chatId, `❌ End time must be in the future.\n\nCurrent time: ${new Date().toISOString()}\nYour time: ${endTime.toISOString()}`);
     return;
   }
 
