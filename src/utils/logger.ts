@@ -1,6 +1,6 @@
 import pino from 'pino';
 
-export const logger = pino({
+const pinoLogger = pino({
   level: process.env.LOG_LEVEL || 'info',
   transport: {
     target: 'pino-pretty',
@@ -11,4 +11,18 @@ export const logger = pino({
     },
   },
 });
+
+// Wrapper to handle error logging more flexibly
+export const logger = {
+  info: (msg: string, ...args: any[]) => pinoLogger.info(msg, ...args),
+  warn: (msg: string, ...args: any[]) => pinoLogger.warn(msg, ...args),
+  error: (msg: string, error?: any) => {
+    if (error) {
+      pinoLogger.error({ err: error }, msg);
+    } else {
+      pinoLogger.error(msg);
+    }
+  },
+  debug: (msg: string, ...args: any[]) => pinoLogger.debug(msg, ...args),
+};
 
