@@ -378,8 +378,8 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.editMessageText(
         `✅ DEX: ${dex.toUpperCase()}\n\n` +
         `Step 3/5: End Time\n\n` +
-        `Please send the raffle end time in format: YYYY-MM-DDTHH:mm:ss\n\n` +
-        `Example: 2024-12-31T23:59:59`,
+        `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
+        `Example: 31/12/2024 23:59:59`,
         {
           chat_id: chatId,
           message_id: query.message!.message_id,
@@ -490,8 +490,8 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.editMessageText(
         `✅ DEX: ${conversation.data.dex.toUpperCase()}\n\n` +
         `Step 3/5: End Time\n\n` +
-        `Please send the raffle end time in format: YYYY-MM-DDTHH:mm:ss\n\n` +
-        `Example: 2024-12-31T23:59:59`,
+        `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
+        `Example: 31/12/2024 23:59:59`,
         {
           chat_id: chatId,
           message_id: query.message!.message_id,
