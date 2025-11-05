@@ -1,0 +1,358 @@
+import TelegramBot from 'node-telegram-bot-api';
+import { bot } from '../index';
+import { prisma } from '../utils/database';
+import { logger } from '../utils/logger';
+import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS } from '../utils/constants';
+import { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
+import { conversationManager } from '../conversation';
+
+// Re-export UI handler
+export { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
+
+export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
+  const args = msg.text?.split(' ').slice(1) || [];
+
+  // Check if user is in a conversation
+  const conversation = conversationManager.getConversation(userId, chatId);
+  if (conversation && conversation.step.startsWith('create_raffle')) {
+    await handleCreateRaffleStep(msg, conversation.step, conversation.data);
+    return;
+  }
+
+  // If no args, use UI mode
+  if (args.length === 0) {
+    await handleCreateRaffleUI(msg);
+    return;
+  }
+
+  // Otherwise, use command mode with args (keeping original implementation)
+  if (args.length < 4) {
+    await bot.sendMessage(
+      chatId,
+      `📝 Usage: /create_raffle <contract_address> <dex> <end_time> <prize_type> <prize_amount>\n\n` +
+      `Example: /create_raffle 0x123... cetus 2024-12-31T23:59:59 SUI 1000\n\n` +
+      `Or use /create_raffle without arguments for interactive mode.\n\n` +
+      `DEX options: ${DEX_OPTIONS.join(', ')}\n` +
+      `Prize types: ${PRIZE_TYPES.join(', ')}\n` +
+      `End time format: YYYY-MM-DDTHH:mm:ss`
+    );
+    return;
+  }
+
+  const [ca, dex, endTimeStr, prizeType, prizeAmount] = args;
+
+  if (!DEX_OPTIONS.includes(dex.toLowerCase() as any)) {
+    await bot.sendMessage(chatId, `❌ Invalid DEX. Must be one of: ${DEX_OPTIONS.join(', ')}`);
+    return;
+  }
+
+  if (!PRIZE_TYPES.includes(prizeType as any)) {
+    await bot.sendMessage(chatId, `❌ Invalid prize type. Must be one of: ${PRIZE_TYPES.join(', ')}`);
+    return;
+  }
+
+  try {
+    const endTime = new Date(endTimeStr);
+    if (isNaN(endTime.getTime())) {
+      await bot.sendMessage(chatId, '❌ Invalid date format. Use: YYYY-MM-DDTHH:mm:ss');
+      return;
+    }
+
+    if (endTime <= new Date()) {
+      await bot.sendMessage(chatId, '❌ End time must be in the future.');
+      return;
+    }
+
+    // Check if there's already an active raffle
+    const activeRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: RAFFLE_STATUS.ACTIVE,
+        endTime: { gt: new Date() },
+      },
+    });
+
+    if (activeRaffle) {
+      await bot.sendMessage(
+        chatId,
+        `❌ There is already an active raffle. End it first or wait for it to complete.\n\n` +
+        `Active raffle ID: ${activeRaffle.id}`
+      );
+      return;
+    }
+
+    const raffle = await prisma.raffle.create({
+      data: {
+        ca,
+        dex: dex.toLowerCase(),
+        startTime: new Date(),
+        endTime,
+        prizeType,
+        prizeAmount,
+        status: RAFFLE_STATUS.ACTIVE,
+      },
+    });
+
+    await bot.sendMessage(
+      chatId,
+      `✅ Raffle created successfully!\n\n` +
+      `Raffle ID: ${raffle.id}\n` +
+      `Contract Address: ${ca}\n` +
+      `DEX: ${dex.toUpperCase()}\n` +
+      `Ends: ${endTime.toLocaleString()}\n` +
+      `Prize: ${prizeAmount} ${prizeType}`
+    );
+  } catch (error) {
+    logger.error('Error creating raffle:', error);
+    await bot.sendMessage(chatId, '❌ Error creating raffle. Please try again.');
+  }
+}
+
+export async function handleSetPrize(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const args = msg.text?.split(' ').slice(1) || [];
+
+  if (args.length < 2) {
+    await bot.sendMessage(
+      chatId,
+      `📝 Usage: /set_prize <prize_type> <prize_amount>\n\n` +
+      `Example: /set_prize USDC 500\n\n` +
+      `Prize types: ${PRIZE_TYPES.join(', ')}`
+    );
+    return;
+  }
+
+  const [prizeType, prizeAmount] = args;
+
+  if (!PRIZE_TYPES.includes(prizeType as any)) {
+    await bot.sendMessage(chatId, `❌ Invalid prize type. Must be one of: ${PRIZE_TYPES.join(', ')}`);
+    return;
+  }
+
+  try {
+    const activeRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: RAFFLE_STATUS.ACTIVE,
+        endTime: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!activeRaffle) {
+      await bot.sendMessage(chatId, '❌ No active raffle found.');
+      return;
+    }
+
+    await prisma.raffle.update({
+      where: { id: activeRaffle.id },
+      data: {
+        prizeType,
+        prizeAmount,
+      },
+    });
+
+    await bot.sendMessage(
+      chatId,
+      `✅ Prize updated!\n\n` +
+      `Raffle ID: ${activeRaffle.id}\n` +
+      `Prize: ${prizeAmount} ${prizeType}`
+    );
+  } catch (error) {
+    logger.error('Error setting prize:', error);
+    await bot.sendMessage(chatId, '❌ Error setting prize. Please try again.');
+  }
+}
+
+export async function handleUploadMedia(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  let mediaFileId: string | undefined;
+  let mediaType: string | undefined;
+
+  // Check for photo
+  if (msg.photo && msg.photo.length > 0) {
+    const largestPhoto = msg.photo[msg.photo.length - 1];
+    mediaFileId = largestPhoto.file_id;
+    mediaType = MEDIA_TYPES.IMAGE;
+  }
+  // Check for video
+  else if (msg.video) {
+    mediaFileId = msg.video.file_id;
+    mediaType = MEDIA_TYPES.VIDEO;
+  }
+  // Check for animation (GIF)
+  else if (msg.animation) {
+    mediaFileId = msg.animation.file_id;
+    mediaType = MEDIA_TYPES.GIF;
+  }
+  else {
+    await bot.sendMessage(
+      chatId,
+      '📸 Please send an image, video, or GIF to upload.\n\n' +
+      'Reply to this message with the media file.'
+    );
+    return;
+  }
+
+  try {
+    const activeRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: RAFFLE_STATUS.ACTIVE,
+        endTime: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!activeRaffle) {
+      await bot.sendMessage(chatId, '❌ No active raffle found.');
+      return;
+    }
+
+    await prisma.raffle.update({
+      where: { id: activeRaffle.id },
+      data: {
+        mediaUrl: mediaFileId,
+        mediaType,
+      },
+    });
+
+    await bot.sendMessage(
+      chatId,
+      `✅ Media uploaded successfully!\n\n` +
+      `Type: ${mediaType}\n` +
+      `Raffle ID: ${activeRaffle.id}`
+    );
+  } catch (error) {
+    logger.error('Error uploading media:', error);
+    await bot.sendMessage(chatId, '❌ Error uploading media. Please try again.');
+  }
+}
+
+export async function handleAwardPrize(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+
+  try {
+    const endedRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: { in: [RAFFLE_STATUS.ENDED, RAFFLE_STATUS.WINNER_SELECTED] },
+      },
+      orderBy: { endTime: 'desc' },
+      include: {
+        winners: true,
+      },
+    });
+
+    if (!endedRaffle) {
+      await bot.sendMessage(chatId, '❌ No ended raffle found.');
+      return;
+    }
+
+    if (endedRaffle.winners.length === 0) {
+      await bot.sendMessage(chatId, '❌ No winner selected for this raffle yet.');
+      return;
+    }
+
+    const winner = endedRaffle.winners[0];
+
+    if (winner.prizeAwarded) {
+      await bot.sendMessage(
+        chatId,
+        `✅ Prize already awarded!\n\n` +
+        `Winner: ${winner.walletAddress}\n` +
+        `Tickets: ${winner.ticketCount}\n` +
+        `Awarded at: ${winner.awardedAt?.toLocaleString()}`
+      );
+      return;
+    }
+
+    await prisma.winner.update({
+      where: { id: winner.id },
+      data: {
+        prizeAwarded: true,
+        awardedAt: new Date(),
+      },
+    });
+
+    await bot.sendMessage(
+      chatId,
+      `✅ Prize marked as awarded!\n\n` +
+      `Raffle ID: ${endedRaffle.id}\n` +
+      `Winner: ${winner.walletAddress}\n` +
+      `Tickets: ${winner.ticketCount}\n` +
+      `Prize: ${endedRaffle.prizeAmount} ${endedRaffle.prizeType}\n\n` +
+      `Please send the prize to the winner's wallet address.`
+    );
+
+    // Notify winner if they have linked their wallet
+    const walletUser = await prisma.walletUser.findUnique({
+      where: { walletAddress: winner.walletAddress },
+    });
+
+    if (walletUser) {
+      try {
+        await bot.sendMessage(
+          walletUser.telegramUserId.toString(),
+          `🎉 Congratulations! You won the raffle!\n\n` +
+          `Prize: ${endedRaffle.prizeAmount} ${endedRaffle.prizeType}\n` +
+          `Your tickets: ${winner.ticketCount}\n\n` +
+          `The prize will be sent to: ${winner.walletAddress}`
+        );
+      } catch (error) {
+        logger.warn('Could not notify winner:', error);
+      }
+    }
+  } catch (error) {
+    logger.error('Error awarding prize:', error);
+    await bot.sendMessage(chatId, '❌ Error awarding prize. Please try again.');
+  }
+}
+
+export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+
+  try {
+    const activeRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: RAFFLE_STATUS.ACTIVE,
+        endTime: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: {
+            tickets: true,
+            buyEvents: true,
+          },
+        },
+      },
+    });
+
+    if (!activeRaffle) {
+      await bot.sendMessage(chatId, '📭 No active raffle found.');
+      return;
+    }
+
+    const totalTickets = await prisma.ticket.aggregate({
+      where: { raffleId: activeRaffle.id },
+      _sum: { ticketCount: true },
+    });
+
+    const configMessage = `⚙️ **Raffle Configuration**\n\n` +
+      `ID: ${activeRaffle.id}\n` +
+      `Contract Address: ${activeRaffle.ca}\n` +
+      `DEX: ${activeRaffle.dex.toUpperCase()}\n` +
+      `Start Time: ${activeRaffle.startTime.toLocaleString()}\n` +
+      `End Time: ${activeRaffle.endTime.toLocaleString()}\n` +
+      `Prize: ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}\n` +
+      `Status: ${activeRaffle.status}\n` +
+      `Total Buy Events: ${activeRaffle._count.buyEvents}\n` +
+      `Total Tickets: ${totalTickets._sum.ticketCount || 0}\n` +
+      `Unique Wallets: ${activeRaffle._count.tickets}`;
+
+    await bot.sendMessage(chatId, configMessage, { parse_mode: 'Markdown' });
+  } catch (error) {
+    logger.error('Error fetching config:', error);
+    await bot.sendMessage(chatId, '❌ Error fetching configuration. Please try again.');
+  }
+}
+

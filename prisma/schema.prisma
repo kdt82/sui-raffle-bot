@@ -1,0 +1,203 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Raffle {
+  id          String   @id @default(cuid())
+  ca          String   // Contract address to monitor
+  dex         String   // DEX name: cetus, turbos, 7kag, dexscreener, suidex
+  startTime   DateTime @default(now())
+  endTime     DateTime
+  prizeType   String   // USDC, AQUA, or SUI
+  prizeAmount String   // Amount as string to handle decimals
+  mediaUrl    String?  // Telegram file ID or URL
+  mediaType   String?  // image, video, gif
+  status      String   @default("active") // active, ended, winner_selected
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tickets   Ticket[]
+  buyEvents BuyEvent[]
+  winners   Winner[]
+
+  @@index([status])
+  @@index([endTime])
+  @@index([dex])
+}
+
+model Ticket {
+  id            String   @id @default(cuid())
+  raffleId      String
+  walletAddress String
+  ticketCount   Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+
+  @@unique([raffleId, walletAddress])
+  @@index([raffleId, ticketCount])
+  @@index([walletAddress])
+}
+
+model BuyEvent {
+  id            String   @id @default(cuid())
+  raffleId      String
+  walletAddress String
+  tokenAmount   String   // Token amount purchased
+  ticketCount   Int      // Calculated: tokenAmount * 100
+  transactionHash String @unique
+  timestamp     DateTime @default(now())
+  processed     Boolean  @default(false)
+
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+
+  @@index([raffleId])
+  @@index([walletAddress])
+  @@index([transactionHash])
+  @@index([processed])
+}
+
+model WalletUser {
+  walletAddress   String   @id
+  telegramUserId  BigInt
+  telegramUsername String?
+  verified        Boolean  @default(false)
+  linkedAt        DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([telegramUserId])
+}
+
+model Admin {
+  id             String   @id @default(cuid())
+  telegramUserId BigInt   @unique
+  permissions    String   @default("admin") // admin, super_admin
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([telegramUserId])
+}
+
+model Winner {
+  id            String   @id @default(cuid())
+  raffleId      String
+  walletAddress String
+  ticketCount   Int
+  selectedAt    DateTime @default(now())
+  prizeAwarded  Boolean  @default(false)
+  awardedAt     DateTime?
+
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+
+  @@unique([raffleId])
+  @@index([raffleId])
+  @@index([walletAddress])
+}
+
+model NotificationPreference {
+  id                   String   @id @default(cuid())
+  telegramUserId       BigInt   @unique
+  dailySummary         Boolean  @default(true)
+  raffleReminders      Boolean  @default(true)
+  ticketAllocations    Boolean  @default(true)
+  winnerAnnouncements  Boolean  @default(true)
+  timezone             String   @default("UTC")
+  preferredTime        String   @default("09:00") // HH:mm format for daily summary
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([telegramUserId])
+}
+
+model ScheduledNotification {
+  id              String   @id @default(cuid())
+  raffleId        String?
+  type            String   // daily_summary, raffle_reminder, winner_announcement, admin_alert
+  scheduledFor    DateTime
+  sent            Boolean  @default(false)
+  sentAt          DateTime?
+  targetUserIds   String[] // Array of telegram user IDs, empty for broadcast
+  metadata        String?  // JSON metadata for the notification
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([type])
+  @@index([scheduledFor, sent])
+  @@index([raffleId])
+}
+
+model DailyAnalytics {
+  id                    String   @id @default(cuid())
+  date                  DateTime @unique // Date at midnight UTC
+  activeUsers           Int      @default(0) // Unique users who interacted
+  newUsers              Int      @default(0) // New wallet links
+  totalTicketsAllocated Int      @default(0) // Tickets given out
+  totalBuyEvents        Int      @default(0) // Number of buy transactions
+  totalTokenVolume      String   @default("0") // Total tokens purchased
+  commandsExecuted      Int      @default(0) // Total commands run
+  uniqueWallets         Int      @default(0) // Unique wallets that bought
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  dexStats DexDailyStats[]
+
+  @@index([date])
+}
+
+model DexDailyStats {
+  id                String   @id @default(cuid())
+  analyticsId       String
+  dex               String   // cetus, turbos, etc.
+  buyEvents         Int      @default(0)
+  tokenVolume       String   @default("0")
+  uniqueWallets     Int      @default(0)
+  ticketsAllocated  Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  analytics DailyAnalytics @relation(fields: [analyticsId], references: [id], onDelete: Cascade)
+
+  @@unique([analyticsId, dex])
+  @@index([analyticsId])
+  @@index([dex])
+}
+
+model RaffleAnalytics {
+  id                    String   @id @default(cuid())
+  raffleId              String   @unique
+  totalParticipants     Int      @default(0)
+  totalTickets          Int      @default(0)
+  totalBuyEvents        Int      @default(0)
+  totalTokenVolume      String   @default("0")
+  uniqueWallets         Int      @default(0)
+  averageTicketsPerUser Float    @default(0)
+  medianTicketsPerUser  Int      @default(0)
+  topWalletTickets      Int      @default(0)
+  participationRate     Float    @default(0) // Participants / Total users
+  durationHours         Float    @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([raffleId])
+}
+
+model UserActivity {
+  id             String   @id @default(cuid())
+  telegramUserId BigInt
+  activityType   String   // command, buy_event, wallet_link, raffle_join
+  metadata       String?  // JSON data
+  timestamp      DateTime @default(now())
+
+  @@index([telegramUserId])
+  @@index([activityType])
+  @@index([timestamp])
+}
+
