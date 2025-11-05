@@ -5,9 +5,11 @@ import { logger } from '../utils/logger';
 
 export async function isAdmin(telegramUserId: bigint): Promise<boolean> {
   try {
+    logger.info(`Checking admin status for Telegram user ID: ${telegramUserId}`);
     const admin = await prisma.admin.findUnique({
       where: { telegramUserId },
     });
+    logger.info(`Admin found: ${!!admin}`, admin ? { id: admin.id, permissions: admin.permissions } : {});
     return !!admin;
   } catch (error) {
     logger.error('Error checking admin status:', error);
