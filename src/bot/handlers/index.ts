@@ -120,6 +120,16 @@ export function registerAdminHandlers(): void {
     });
   });
 
+  bot.onText(/\/cancel_raffle/, async (msg) => {
+    await requireAdmin(msg, async () => {
+      try {
+        await handleCancelRaffle(msg);
+      } catch (error) {
+        logger.error('Error handling /cancel_raffle command:', error);
+      }
+    });
+  });
+
   bot.onText(/\/set_prize/, async (msg) => {
     await requireAdmin(msg, async () => {
       try {
