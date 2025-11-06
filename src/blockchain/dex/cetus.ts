@@ -57,24 +57,66 @@ export class CetusIntegration implements DexIntegration {
   }
 
   private async parseSwapEvent(event: any, targetTokenAddress: string): Promise<BuyEventData | null> {
-    // Parse Cetus swap event
-    // This is a placeholder - actual implementation would parse event data
-    // to extract buyer address and token amount for the target token
-    
-    // Example event structure:
-    // - event.type: swap event type
-    // - event.parsedJson: parsed event data
-    
-    logger.debug('Parsing Cetus swap event:', event);
-    
-    // TODO: Implement actual parsing logic based on Cetus event structure
-    // This would involve:
-    // 1. Checking if the swap involves the target token
-    // 2. Extracting buyer wallet address
-    // 3. Extracting token amount purchased
-    // 4. Getting transaction hash
-    
-    return null; // Placeholder
+    try {
+      logger.info('Received Cetus event:', { type: event.type, id: event.id?.txDigest });
+      
+      // Check if this is a swap event
+      if (!event.type || !event.type.includes('Swap')) {
+        return null;
+      }
+
+      const parsedJson = event.parsedJson;
+      if (!parsedJson) {
+        logger.debug('No parsed JSON in event');
+        return null;
+      }
+
+      logger.info('Cetus swap event data:', parsedJson);
+
+      // Extract token addresses from the swap
+      // Cetus events typically have coin types in the event type or parsed data
+      const eventType = event.type || '';
+      
+      // Check if our target token is involved in the swap
+      const normalizedTarget = targetTokenAddress.toLowerCase();
+      const eventTypeLower = eventType.toLowerCase();
+      
+      if (!eventTypeLower.includes(normalizedTarget)) {
+        logger.debug(`Event doesn't involve target token: ${targetTokenAddress}`);
+        return null;
+      }
+
+      // Extract swap details
+      // Common fields in Cetus swap events:
+      // - amount_in, amount_out
+      // - partner (the wallet performing the swap)
+      // - coin_a, coin_b (token types)
+      
+      const sender = parsedJson.partner || parsedJson.sender || parsedJson.user;
+      const amountIn = parsedJson.amount_in || parsedJson.amountIn || parsedJson.amount_a;
+      const amountOut = parsedJson.amount_out || parsedJson.amountOut || parsedJson.amount_b;
+      
+      if (!sender) {
+        logger.warn('Could not extract sender from Cetus event');
+        return null;
+      }
+
+      // Determine which amount is for our token (the "buy" amount)
+      // If they're buying our token, it would be the amount_out
+      const tokenAmount = amountOut || amountIn || '1';
+
+      logger.info(`✅ Cetus BUY DETECTED! Wallet: ${sender}, Amount: ${tokenAmount}`);
+
+      return {
+        walletAddress: sender,
+        tokenAmount: tokenAmount.toString(),
+        transactionHash: event.id?.txDigest || `cetus_${Date.now()}`,
+        timestamp: new Date(parseInt(event.timestampMs || Date.now().toString())),
+      };
+    } catch (error) {
+      logger.error('Error parsing Cetus swap event:', error);
+      return null;
+    }
   }
 }
 
