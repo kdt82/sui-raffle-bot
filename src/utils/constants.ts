@@ -1,4 +1,4 @@
-export const TICKETS_PER_TOKEN = 100;
+export const DEFAULT_TICKETS_PER_TOKEN = 100;
 export const PRIZE_TYPES = ['USDC', 'AQUA', 'SUI'] as const;
 export type PrizeType = (typeof PRIZE_TYPES)[number];
 

@@ -4,7 +4,7 @@ import { getSuiClient } from './sui-client';
 import { getBlockberryClient, BlockberryRawTrade } from './blockberry-client';
 import { prisma } from '../utils/database';
 import { logger } from '../utils/logger';
-import { RAFFLE_STATUS, TICKETS_PER_TOKEN } from '../utils/constants';
+import { RAFFLE_STATUS, DEFAULT_TICKETS_PER_TOKEN } from '../utils/constants';
 import { getRedisClient } from '../utils/redis';
 import { bot } from '../bot';
 
@@ -41,7 +41,7 @@ interface NormalizedBlockberryTrade {
 }
 
 export class BuyDetector {
-  private activeRaffle: { id: string; ca: string; minimumPurchase?: string | null } | null = null;
+  private activeRaffle: { id: string; ca: string; minimumPurchase?: string | null; ticketsPerToken?: string | null } | null = null;
   private rafflePollInterval: NodeJS.Timeout | null = null;
   private onChainPollInterval: NodeJS.Timeout | null = null;
   private processedEventIds: Set<string> = new Set();
@@ -89,7 +89,8 @@ export class BuyDetector {
         this.activeRaffle = { 
           id: raffle.id, 
           ca: raffle.ca,
-          minimumPurchase: raffle.minimumPurchase 
+          minimumPurchase: raffle.minimumPurchase,
+          ticketsPerToken: raffle.ticketsPerToken
         };
 
         if (hasChanged) {
@@ -791,6 +792,11 @@ export class BuyDetector {
 
   private calculateTicketCount(data: BuyEventData): number {
     try {
+      // Get the tickets per token ratio for this raffle
+      const ticketsPerToken = this.activeRaffle?.ticketsPerToken 
+        ? parseFloat(this.activeRaffle.ticketsPerToken) 
+        : DEFAULT_TICKETS_PER_TOKEN;
+
       // Check minimum purchase requirement
       if (this.activeRaffle?.minimumPurchase) {
         const minimumRequired = parseFloat(this.activeRaffle.minimumPurchase);
@@ -816,13 +822,19 @@ export class BuyDetector {
 
       if (data.rawAmount && data.decimals !== undefined) {
         const amount = BigInt(data.rawAmount);
-        const multiplier = BigInt(TICKETS_PER_TOKEN);
         const scale = BigInt(10) ** BigInt(data.decimals);
         if (scale === 0n) {
           return 0;
         }
 
-        const ticketsBig = (amount * multiplier) / scale;
+        // Convert ticketsPerToken to a ratio we can use with BigInt
+        // For very small ratios (e.g., 0.0002 = 1 ticket per 5000 tokens), we need precision
+        const PRECISION = 1000000; // 6 decimal places of precision
+        const ratio = Math.floor(ticketsPerToken * PRECISION);
+        const ratioBig = BigInt(ratio);
+        const precisionBig = BigInt(PRECISION);
+
+        const ticketsBig = (amount * ratioBig) / (scale * precisionBig);
 
         if (ticketsBig > BigInt(Number.MAX_SAFE_INTEGER)) {
           logger.warn('Calculated ticket count exceeds safe integer range', {
@@ -839,14 +851,17 @@ export class BuyDetector {
       if (Number.isNaN(asFloat)) {
         return 0;
       }
-      return Math.floor(asFloat * TICKETS_PER_TOKEN);
+      return Math.floor(asFloat * ticketsPerToken);
     } catch (error) {
       logger.warn('Falling back to float-based ticket calculation', error);
+      const ticketsPerToken = this.activeRaffle?.ticketsPerToken 
+        ? parseFloat(this.activeRaffle.ticketsPerToken) 
+        : DEFAULT_TICKETS_PER_TOKEN;
       const asFloat = Number.parseFloat(data.tokenAmount);
       if (Number.isNaN(asFloat)) {
         return 0;
       }
-      return Math.floor(asFloat * TICKETS_PER_TOKEN);
+      return Math.floor(asFloat * ticketsPerToken);
     }
   }
 

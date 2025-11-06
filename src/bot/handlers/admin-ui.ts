@@ -160,6 +160,9 @@ export async function handleCreateRaffleStep(
     case 'create_raffle_prize_amount':
       await handlePrizeAmountStep(msg, data);
       break;
+    case 'create_raffle_ticket_ratio':
+      await handleTicketRatioStep(msg, data);
+      break;
     case 'create_raffle_minimum_purchase':
       await handleMinimumPurchaseStep(msg, data);
       break;
@@ -391,13 +394,13 @@ async function handlePrizeAmountStep(msg: TelegramBot.Message, data: Record<stri
 
   data.prizeAmount = prizeAmount;
   conversationManager.updateConversation(userId, chatId, {
-    step: 'create_raffle_minimum_purchase',
+    step: 'create_raffle_ticket_ratio',
     data,
   });
 
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
-      [{ text: '⏭️ Skip (No Minimum)', callback_data: 'skip_minimum_purchase' }],
+      [{ text: '🎯 100 tickets per token (Default)', callback_data: 'ratio_default' }],
       [{ text: '🔙 Back', callback_data: 'back_to_prize_type' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
   };
@@ -405,7 +408,58 @@ async function handlePrizeAmountStep(msg: TelegramBot.Message, data: Record<stri
   await bot.sendMessage(
     chatId,
     `✅ Prize Amount: ${prizeAmount}\n\n` +
-    `Step 6/6: Minimum Purchase (Optional)\n\n` +
+    `Step 6/7: Ticket Ratio\n\n` +
+    `Set how many tickets are earned per token purchased.\n\n` +
+    `**Format Options:**\n` +
+    `• Enter "100" = 100 tickets per token\n` +
+    `• Enter "0.0002" = 1 ticket per 5,000 tokens\n` +
+    `• Enter "0.001" = 1 ticket per 1,000 tokens\n\n` +
+    `💡 Tip: Smaller ratios (like 0.0002) are good for high-volume/low-value tokens.\n\n` +
+    `Send the ratio, or click "Default" for 100 tickets per token:`,
+    {
+      reply_markup: keyboard,
+    }
+  );
+}
+
+async function handleTicketRatioStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
+  const ratioInput = msg.text?.trim();
+
+  if (!ratioInput || isNaN(parseFloat(ratioInput)) || parseFloat(ratioInput) <= 0) {
+    await bot.sendMessage(chatId, '❌ Please send a valid ratio (number greater than 0), or click "Default".');
+    return;
+  }
+
+  const ratio = parseFloat(ratioInput);
+  data.ticketsPerToken = ratioInput;
+
+  conversationManager.updateConversation(userId, chatId, {
+    step: 'create_raffle_minimum_purchase',
+    data,
+  });
+
+  const keyboard: TelegramBot.InlineKeyboardMarkup = {
+    inline_keyboard: [
+      [{ text: '⏭️ Skip (No Minimum)', callback_data: 'skip_minimum_purchase' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_prize_amount' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+    ],
+  };
+
+  // Display a human-readable explanation
+  let ratioExplanation;
+  if (ratio >= 1) {
+    ratioExplanation = `${ratio} tickets per token`;
+  } else {
+    const tokensPerTicket = Math.round(1 / ratio);
+    ratioExplanation = `1 ticket per ${tokensPerTicket.toLocaleString()} tokens`;
+  }
+
+  await bot.sendMessage(
+    chatId,
+    `✅ Ticket Ratio: ${ratioExplanation}\n\n` +
+    `Step 7/7: Minimum Purchase (Optional)\n\n` +
     `Set a minimum token purchase amount to earn tickets.\n` +
     `Purchases below this amount will not earn tickets.\n\n` +
     `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -451,6 +505,16 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
   const dexValue = typeof data.dex === 'string' && data.dex.length > 0 ? data.dex : DEFAULT_DEX;
   const dexDisplay = getDexDisplayName(dexValue as DexType).toUpperCase();
   
+  // Format ticket ratio for display
+  const ratio = parseFloat(data.ticketsPerToken || '100');
+  let ratioDisplay;
+  if (ratio >= 1) {
+    ratioDisplay = `${ratio} tickets per token`;
+  } else {
+    const tokensPerTicket = Math.round(1 / ratio);
+    ratioDisplay = `1 ticket per ${tokensPerTicket.toLocaleString()} tokens`;
+  }
+  
   const minimumText = data.minimumPurchase 
     ? `\nMinimum Purchase: ${data.minimumPurchase} tokens` 
     : '\nMinimum Purchase: None';
@@ -461,7 +525,8 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     `Contract Address: \`${data.contractAddress}\`\n` +
     `Data: ${dexDisplay}\n` +
     `Prize Type: ${data.prizeType}\n` +
-    `Prize Amount: ${data.prizeAmount}${minimumText}\n\n` +
+    `Prize Amount: ${data.prizeAmount}\n` +
+    `Ticket Ratio: ${ratioDisplay}${minimumText}\n\n` +
     `Please review and confirm:`,
     {
       parse_mode: 'Markdown',
@@ -538,6 +603,36 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
           reply_markup: {
             inline_keyboard: [
               [{ text: '🔙 Back', callback_data: 'back_to_start_time' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'ratio_default') {
+      conversation.data.ticketsPerToken = '100';
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_minimum_purchase',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: 'Set to 100 tickets per token' });
+      await bot.editMessageText(
+        `✅ Ticket Ratio: 100 tickets per token\n\n` +
+        `Step 7/7: Minimum Purchase (Optional)\n\n` +
+        `Set a minimum token purchase amount to earn tickets.\n` +
+        `Purchases below this amount will not earn tickets.\n\n` +
+        `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
+        `Example: Enter "10" for 10 tokens, not "10000000000"\n\n` +
+        `Send the minimum amount, or click "Skip" for no minimum:`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏭️ Skip (No Minimum)', callback_data: 'skip_minimum_purchase' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_ticket_ratio' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
             ],
           },
         }
@@ -694,15 +789,54 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       return;
     }
 
+    if (callbackData === 'back_to_ticket_ratio') {
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_ticket_ratio',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id);
+      await bot.editMessageText(
+        `✅ Prize Amount: ${conversation.data.prizeAmount} ${conversation.data.prizeType}\n\n` +
+        `Step 6/7: Ticket Ratio\n\n` +
+        `Set how many tickets users get per token purchased.\n\n` +
+        `💡 Two formats:\n` +
+        `• Enter "100" for 100 tickets per token\n` +
+        `• Enter "0.0002" for 1 ticket per 5,000 tokens\n\n` +
+        `Send the ratio number:`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🎯 100 tickets per token (Default)', callback_data: 'ratio_default' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_prize_amount' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
     if (callbackData === 'back_to_minimum_purchase') {
       conversationManager.updateConversation(userId, chatId, {
         step: 'create_raffle_minimum_purchase',
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
+      
+      // Format ticket ratio for display
+      const ratio = parseFloat(conversation.data.ticketsPerToken || '100');
+      let ratioDisplay;
+      if (ratio >= 1) {
+        ratioDisplay = `${ratio} tickets per token`;
+      } else {
+        const tokensPerTicket = Math.round(1 / ratio);
+        ratioDisplay = `1 ticket per ${tokensPerTicket.toLocaleString()} tokens`;
+      }
+      
       await bot.editMessageText(
-        `✅ Prize Amount: ${conversation.data.prizeAmount}\n\n` +
-        `Step 6/6: Minimum Purchase (Optional)\n\n` +
+        `✅ Ticket Ratio: ${ratioDisplay}\n\n` +
+        `Step 7/7: Minimum Purchase (Optional)\n\n` +
         `Set a minimum token purchase amount to earn tickets.\n` +
         `Purchases below this amount will not earn tickets.\n\n` +
         `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -711,10 +845,11 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         {
           chat_id: chatId,
           message_id: query.message!.message_id,
+          parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
               [{ text: '⏭️ Skip (No Minimum)', callback_data: 'skip_minimum_purchase' }],
-              [{ text: '🔙 Back', callback_data: 'back_to_prize_amount' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_ticket_ratio' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
             ],
           },
         }
@@ -737,10 +872,21 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         endTime: new Date(data.endTime),
         prizeType: data.prizeType,
         prizeAmount: data.prizeAmount,
+        ticketsPerToken: data.ticketsPerToken || '100',
         minimumPurchase: data.minimumPurchase || null,
         status: RAFFLE_STATUS.ACTIVE,
       },
     });
+
+    // Format ticket ratio for display
+    const ratio = parseFloat(raffle.ticketsPerToken || '100');
+    let ratioDisplay;
+    if (ratio >= 1) {
+      ratioDisplay = `${ratio} tickets per token`;
+    } else {
+      const tokensPerTicket = Math.round(1 / ratio);
+      ratioDisplay = `1 ticket per ${tokensPerTicket.toLocaleString()} tokens`;
+    }
 
     const minimumText = raffle.minimumPurchase 
       ? `\nMinimum Purchase: ${raffle.minimumPurchase} tokens` 
@@ -754,7 +900,8 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
       `Start: ${raffle.startTime.toLocaleString()} UTC\n` +
       `Ends: ${raffle.endTime.toLocaleString()} UTC\n` +
-      `Prize: ${raffle.prizeAmount} ${raffle.prizeType}${minimumText}`,
+      `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n` +
+      `Ticket Ratio: ${ratioDisplay}${minimumText}`,
       { parse_mode: 'Markdown' }
     );
   } catch (error) {
