@@ -6,7 +6,7 @@ import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
 import { handleBackupCommand, handleBackupListCommand, handleBackupDownloadCommand, handleBackupRestoreCommand, handleBackupRaffleCommand, handleBackupCleanupCommand } from './backup';
-import { requireAdmin, requireAdminCallback } from '../middleware';
+import { requireAdmin, requireAdminCallback, requireAdminPrivate, requireAdminPrivateCallback } from '../middleware';
 import { conversationManager } from '../conversation';
 import { withCallbackRateLimit } from '../rate-limit-middleware';
 
@@ -82,7 +82,7 @@ export function registerAdminHandlers(): void {
           callbackData === 'cancel_create_raffle' ||
           callbackData.startsWith('back_to_')) {
         await withCallbackRateLimit(query, 'callback_ui', async () => {
-          await requireAdminCallback(query, async () => {
+          await requireAdminPrivateCallback(query, async () => {
             await handleCreateRaffleCallback(query);
           });
         });
@@ -101,7 +101,7 @@ export function registerAdminHandlers(): void {
       const conversation = conversationManager.getConversation(userId, msg.chat.id);
       
       if (conversation && conversation.step.startsWith('create_raffle')) {
-        await requireAdmin(msg, async () => {
+        await requireAdminPrivate(msg, async () => {
           await handleCreateRaffleStep(msg, conversation.step, conversation.data);
         });
       }
@@ -111,7 +111,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/create_raffle/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleCreateRaffle(msg);
       } catch (error) {
@@ -121,7 +121,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/cancel_raffle/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleCancelRaffle(msg);
       } catch (error) {
@@ -131,7 +131,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/set_prize/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleSetPrize(msg);
       } catch (error) {
@@ -141,7 +141,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/upload_media/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleUploadMedia(msg);
       } catch (error) {
@@ -151,7 +151,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/award_prize/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleAwardPrize(msg);
       } catch (error) {
@@ -161,7 +161,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/config/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleConfig(msg);
       } catch (error) {
@@ -171,7 +171,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/analytics$/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleAnalyticsCommand(msg);
       } catch (error) {
@@ -181,7 +181,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/analytics_raffles/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleAnalyticsRafflesCommand(msg);
       } catch (error) {
@@ -191,7 +191,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/analytics_export/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleAnalyticsExportCommand(msg);
       } catch (error) {
@@ -201,7 +201,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/analytics_live/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleAnalyticsLiveCommand(msg);
       } catch (error) {
@@ -211,7 +211,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/backup$/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleBackupCommand(msg);
       } catch (error) {
@@ -221,7 +221,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/backup_list/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleBackupListCommand(msg);
       } catch (error) {
@@ -231,7 +231,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/backup_download/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleBackupDownloadCommand(msg);
       } catch (error) {
@@ -241,7 +241,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/backup_restore/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleBackupRestoreCommand(msg);
       } catch (error) {
@@ -251,7 +251,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/backup_raffle/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleBackupRaffleCommand(msg);
       } catch (error) {
@@ -261,7 +261,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.onText(/\/backup_cleanup/, async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleBackupCleanupCommand(msg);
       } catch (error) {
@@ -272,7 +272,7 @@ export function registerAdminHandlers(): void {
 
   // Handle media uploads
   bot.on('photo', async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleUploadMedia(msg);
       } catch (error) {
@@ -282,7 +282,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.on('video', async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleUploadMedia(msg);
       } catch (error) {
@@ -292,7 +292,7 @@ export function registerAdminHandlers(): void {
   });
 
   bot.on('animation', async (msg) => {
-    await requireAdmin(msg, async () => {
+    await requireAdminPrivate(msg, async () => {
       try {
         await handleUploadMedia(msg);
       } catch (error) {
