@@ -50,6 +50,8 @@ export class BuyDetector {
   private initialized = false;
   private useBlockberry = false;
   private blockberryCursor: string | null = null;
+  private blockberryFailureCount = 0;
+  private blockberryFallbackActive = false;
 
   async start(): Promise<void> {
     logger.info('Starting buy detector...');
@@ -181,11 +183,44 @@ export class BuyDetector {
       return;
     }
 
-    if (this.useBlockberry) {
-      await this.pollBlockberryTrades(initial);
-      return;
+    // If Blockberry is configured and not in fallback mode, try it first
+    if (this.useBlockberry && !this.blockberryFallbackActive) {
+      try {
+        await this.pollBlockberryTrades(initial);
+        // Reset failure count on success
+        this.blockberryFailureCount = 0;
+        return;
+      } catch (error) {
+        this.blockberryFailureCount++;
+        logger.error(`Blockberry attempt ${this.blockberryFailureCount}/3 failed:`, error);
+        
+        // After 3 consecutive failures, fall back to native SUI events
+        if (this.blockberryFailureCount >= 3) {
+          logger.warn('⚠️ Blockberry has failed 3 times, falling back to native SUI event stream for reliability');
+          this.blockberryFallbackActive = true;
+          this.processedEventIds.clear();
+          this.lastProcessedTimestamp = 0;
+        } else {
+          // Don't continue to native method yet, wait for next poll
+          return;
+        }
+      }
     }
 
+    // If in fallback mode, occasionally retry Blockberry to see if it recovered
+    if (this.blockberryFallbackActive && Math.random() < 0.1) { // 10% chance each poll
+      try {
+        await this.pollBlockberryTrades(true); // Test with initial=true
+        logger.info('✅ Blockberry has recovered! Switching back to Blockberry API');
+        this.blockberryFallbackActive = false;
+        this.blockberryFailureCount = 0;
+        return;
+      } catch (error) {
+        logger.debug('Blockberry still unavailable, continuing with native SUI events');
+      }
+    }
+
+    // Use native SUI event stream (either as primary or fallback)
     const client = getSuiClient();
     const coinType = this.activeRaffle.ca;
     const transferEventType = `0x2::coin::TransferEvent<${coinType}>`;
@@ -378,6 +413,8 @@ export class BuyDetector {
         this.lastProcessedTimestamp = Date.now();
       }
       logger.error('Failed to query Blockberry trades:', error);
+      // Re-throw to trigger fallback mechanism
+      throw error;
     }
   }
 
