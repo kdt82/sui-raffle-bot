@@ -4,6 +4,7 @@ export type PrizeType = typeof PRIZE_TYPES[number];
 
 export const DEX_OPTIONS = ['cetus', 'turbos', '7kag', 'dexscreener', 'suidex'] as const;
 export type DexType = typeof DEX_OPTIONS[number];
+export const DEFAULT_DEX: DexType = 'dexscreener';
 
 export const DEX_NAMES = {
   CETUS: 'cetus',

@@ -76,8 +76,7 @@ export function registerAdminHandlers(): void {
       if (!callbackData) return;
 
       // Check if it's a create_raffle callback
-      if (callbackData.startsWith('select_dex_') ||
-          callbackData.startsWith('select_prize_type_') ||
+      if (callbackData.startsWith('select_prize_type_') ||
           callbackData === 'confirm_create_raffle' ||
           callbackData === 'cancel_create_raffle' ||
           callbackData.startsWith('back_to_')) {

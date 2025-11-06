@@ -2,7 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
 import { prisma } from '../../utils/database';
 import { logger } from '../../utils/logger';
-import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS } from '../../utils/constants';
+import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX } from '../../utils/constants';
 import { conversationManager } from '../conversation';
 
 // UI Mode: Interactive wizard with buttons
@@ -39,7 +39,7 @@ export async function handleCreateRaffleUI(msg: TelegramBot.Message): Promise<vo
   await bot.sendMessage(
     chatId,
     `🎰 **Create New Raffle**\n\n` +
-    `Step 1/5: Contract Address\n\n` +
+    `Step 1/4: Contract Address\n\n` +
     `Please send the contract address (CA) of the token to monitor.\n\n` +
     `Example: \`0x1234567890abcdef...\``,
     {
@@ -64,22 +64,16 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
   if (args.length < 4) {
     await bot.sendMessage(
       chatId,
-      `📝 Usage: /create_raffle <contract_address> <dex> <end_time> <prize_type> <prize_amount>\n\n` +
-      `Example: /create_raffle 0x123... cetus 2024-12-31T23:59:59 SUI 1000\n\n` +
+      `?? Usage: /create_raffle <contract_address> <end_time> <prize_type> <prize_amount>\n\n` +
+      `Example: /create_raffle 0x123... 2024-12-31T23:59:59 SUI 1000\n\n` +
       `Or use /create_raffle without arguments for interactive mode.\n\n` +
-      `DEX options: ${DEX_OPTIONS.join(', ')}\n` +
       `Prize types: ${PRIZE_TYPES.join(', ')}\n` +
       `End time format: YYYY-MM-DDTHH:mm:ss`
     );
     return;
   }
 
-  const [ca, dex, endTimeStr, prizeType, prizeAmount] = args;
-
-  if (!DEX_OPTIONS.includes(dex.toLowerCase() as any)) {
-    await bot.sendMessage(chatId, `❌ Invalid DEX. Must be one of: ${DEX_OPTIONS.join(', ')}`);
-    return;
-  }
+  const [ca, endTimeStr, prizeType, prizeAmount] = args;
 
   if (!PRIZE_TYPES.includes(prizeType as any)) {
     await bot.sendMessage(chatId, `❌ Invalid prize type. Must be one of: ${PRIZE_TYPES.join(', ')}`);
@@ -118,7 +112,7 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
     const raffle = await prisma.raffle.create({
       data: {
         ca,
-        dex: dex.toLowerCase(),
+        dex: DEFAULT_DEX,
         startTime: new Date(),
         endTime,
         prizeType,
@@ -126,13 +120,12 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
         status: RAFFLE_STATUS.ACTIVE,
       },
     });
-
     await bot.sendMessage(
       chatId,
       `✅ Raffle created successfully!\n\n` +
       `Raffle ID: ${raffle.id}\n` +
       `Contract Address: ${ca}\n` +
-      `DEX: ${dex.toUpperCase()}\n` +
+      `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
       `Ends: ${endTime.toLocaleString()}\n` +
       `Prize: ${prizeAmount} ${prizeType}`
     );
@@ -154,9 +147,6 @@ export async function handleCreateRaffleStep(
   switch (step) {
     case 'create_raffle_contract':
       await handleContractAddressStep(msg, data);
-      break;
-    case 'create_raffle_dex':
-      await handleDexSelectionStep(msg, data);
       break;
     case 'create_raffle_end_time':
       await handleEndTimeStep(msg, data);
@@ -184,21 +174,14 @@ async function handleContractAddressStep(msg: TelegramBot.Message, data: Record<
   }
 
   data.contractAddress = contractAddress;
+  data.dex = DEFAULT_DEX;
   conversationManager.updateConversation(userId, chatId, {
-    step: 'create_raffle_dex',
+    step: 'create_raffle_end_time',
     data,
   });
 
-  // Create DEX selection keyboard
-  const dexButtons = DEX_OPTIONS.map(dex => ({
-    text: dex.toUpperCase(),
-    callback_data: `select_dex_${dex}`,
-  }));
-
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
-      dexButtons.slice(0, 3),
-      dexButtons.slice(3),
       [{ text: '🔙 Back', callback_data: 'back_to_contract' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
   };
@@ -206,17 +189,14 @@ async function handleContractAddressStep(msg: TelegramBot.Message, data: Record<
   await bot.sendMessage(
     chatId,
     `✅ Contract Address: \`${contractAddress}\`\n\n` +
-    `Step 2/5: Select DEX\n\n` +
-    `Choose which DEX to monitor for buys:`,
+    `Step 2/4: End Time\n\n` +
+    `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
+    `Example: 31/12/2024 23:59:59`,
     {
       parse_mode: 'Markdown',
       reply_markup: keyboard,
     }
   );
-}
-
-async function handleDexSelectionStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
-  // This is handled via callback query, not text message
 }
 
 async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
@@ -293,7 +273,7 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
   await bot.sendMessage(
     chatId,
     `✅ End Time: ${endTime.toLocaleString()}\n\n` +
-    `Step 4/5: Prize Type\n\n` +
+    `Step 3/4: Prize Type\n\n` +
     `Select the prize type:`,
     {
       reply_markup: keyboard,
@@ -341,7 +321,7 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     `📋 **Review Raffle Details**\n\n` +
     `Contract Address: \`${data.contractAddress}\`\n` +
     `DEX: ${data.dex.toUpperCase()}\n` +
-    `End Time: ${new Date(data.endTime).toLocaleString()}\n` +
+    `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
     `Prize Type: ${data.prizeType}\n` +
     `Prize Amount: ${data.prizeAmount}\n\n` +
     `Please review and confirm:`,
@@ -375,33 +355,6 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       return;
     }
 
-    if (callbackData.startsWith('select_dex_')) {
-      const dex = callbackData.replace('select_dex_', '');
-      conversation.data.dex = dex;
-      conversationManager.updateConversation(userId, chatId, {
-        step: 'create_raffle_end_time',
-        data: conversation.data,
-      });
-
-      await bot.answerCallbackQuery(query.id, { text: `Selected ${dex.toUpperCase()}` });
-      await bot.editMessageText(
-        `✅ DEX: ${dex.toUpperCase()}\n\n` +
-        `Step 3/5: End Time\n\n` +
-        `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
-        `Example: 31/12/2024 23:59:59`,
-        {
-          chat_id: chatId,
-          message_id: query.message!.message_id,
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '🔙 Back', callback_data: 'back_to_dex' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
-            ],
-          },
-        }
-      );
-      return;
-    }
-
     if (callbackData.startsWith('select_prize_type_')) {
       const prizeType = callbackData.replace('select_prize_type_', '');
       conversation.data.prizeType = prizeType;
@@ -413,7 +366,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id, { text: `Selected ${prizeType}` });
       await bot.editMessageText(
         `✅ Prize Type: ${prizeType}\n\n` +
-        `Step 5/5: Prize Amount\n\n` +
+        `Step 4/4: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
@@ -443,7 +396,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       });
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
-        `Step 1/5: Contract Address\n\n` +
+        `Step 1/4: Contract Address\n\n` +
         `Please send the contract address (CA) of the token to monitor.\n\n` +
         `Example: \`0x1234567890abcdef...\``,
         {
@@ -460,36 +413,6 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       return;
     }
 
-    if (callbackData === 'back_to_dex') {
-      conversationManager.updateConversation(userId, chatId, {
-        step: 'create_raffle_dex',
-        data: conversation.data,
-      });
-      await bot.answerCallbackQuery(query.id);
-      const dexButtons = DEX_OPTIONS.map(dex => ({
-        text: dex.toUpperCase(),
-        callback_data: `select_dex_${dex}`,
-      }));
-      await bot.editMessageText(
-        `✅ Contract Address: \`${conversation.data.contractAddress}\`\n\n` +
-        `Step 2/5: Select DEX\n\n` +
-        `Choose which DEX to monitor for buys:`,
-        {
-          chat_id: chatId,
-          message_id: query.message!.message_id,
-          parse_mode: 'Markdown',
-          reply_markup: {
-            inline_keyboard: [
-              dexButtons.slice(0, 3),
-              dexButtons.slice(3),
-              [{ text: '🔙 Back', callback_data: 'back_to_contract' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
-            ],
-          },
-        }
-      );
-      return;
-    }
-
     if (callbackData === 'back_to_end_time') {
       conversationManager.updateConversation(userId, chatId, {
         step: 'create_raffle_end_time',
@@ -497,16 +420,17 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       });
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
-        `✅ DEX: ${conversation.data.dex.toUpperCase()}\n\n` +
-        `Step 3/5: End Time\n\n` +
+        `? Contract Address: \`${conversation.data.contractAddress}\`\n\n` +
+        `Step 2/4: End Time\n\n` +
         `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
         `Example: 31/12/2024 23:59:59`,
         {
           chat_id: chatId,
           message_id: query.message!.message_id,
+          parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
-              [{ text: '🔙 Back', callback_data: 'back_to_dex' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+              [{ text: '?? Back', callback_data: 'back_to_contract' }, { text: '? Cancel', callback_data: 'cancel_create_raffle' }],
             ],
           },
         }
@@ -526,7 +450,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       }));
       await bot.editMessageText(
         `✅ End Time: ${new Date(conversation.data.endTime).toLocaleString()}\n\n` +
-        `Step 4/5: Prize Type\n\n` +
+        `Step 3/4: Prize Type\n\n` +
         `Select the prize type:`,
         {
           chat_id: chatId,
@@ -550,7 +474,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
         `✅ Prize Type: ${conversation.data.prizeType}\n\n` +
-        `Step 5/5: Prize Amount\n\n` +
+        `Step 4/4: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
@@ -575,7 +499,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
     const raffle = await prisma.raffle.create({
       data: {
         ca: data.contractAddress,
-        dex: data.dex.toLowerCase(),
+        dex: DEFAULT_DEX,
         startTime: new Date(),
         endTime: new Date(data.endTime),
         prizeType: data.prizeType,
@@ -589,7 +513,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       `✅ **Raffle Created Successfully!**\n\n` +
       `Raffle ID: ${raffle.id}\n` +
       `Contract Address: \`${raffle.ca}\`\n` +
-      `DEX: ${raffle.dex.toUpperCase()}\n` +
+      `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
       `Ends: ${raffle.endTime.toLocaleString()}\n` +
       `Prize: ${raffle.prizeAmount} ${raffle.prizeType}`,
       { parse_mode: 'Markdown' }
@@ -599,4 +523,9 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
     await bot.sendMessage(chatId, '❌ Error creating raffle. Please try again.');
   }
 }
+
+
+
+
+
 
