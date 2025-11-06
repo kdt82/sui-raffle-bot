@@ -451,8 +451,10 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
       _sum: { ticketCount: true },
     });
 
-    const minimumText = activeRaffle.minimumPurchase 
-      ? `Minimum Purchase: ${activeRaffle.minimumPurchase} tokens` 
+    // Handle minimumPurchase safely (field might not exist yet if migration hasn't run)
+    const minimumPurchase = (activeRaffle as any).minimumPurchase;
+    const minimumText = minimumPurchase 
+      ? `Minimum Purchase: ${minimumPurchase} tokens` 
       : 'Minimum Purchase: None (all purchases earn tickets)';
 
     const configMessage = `⚙️ **Raffle Configuration**\n\n` +
