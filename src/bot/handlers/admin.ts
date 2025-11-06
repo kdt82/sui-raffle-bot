@@ -398,3 +398,37 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
   }
 }
 
+export async function handleChatInfo(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+
+  try {
+    // Get chat information
+    const chat = msg.chat;
+    const chatType = chat.type;
+    const chatTitle = chat.title || 'N/A';
+    const chatUsername = (chat as any).username ? `@${(chat as any).username}` : 'N/A';
+    
+    // Log to server for easy copy-paste
+    logger.info(`📍 CHAT INFO - ID: ${chatId}, Type: ${chatType}, Title: ${chatTitle}, Username: ${chatUsername}`);
+
+    const infoMessage =
+      `📍 **Chat Information** 📍\n\n` +
+      `**Chat ID:** \`${chatId}\`\n` +
+      `**Chat Type:** \`${chatType}\`\n` +
+      `**Title:** \`${chatTitle}\`\n` +
+      `**Username:** \`${chatUsername}\`\n\n` +
+      `💡 **To use this chat for broadcast notifications:**\n` +
+      `1. Add this variable to Railway:\n` +
+      `   \`BROADCAST_CHANNEL_ID=${chatId}\`\n` +
+      `2. Restart the service\n` +
+      `3. Buy notifications will appear here!\n\n` +
+      `_Note: Make sure the bot is an admin if this is a channel._`;
+
+    await bot.sendMessage(chatId, infoMessage, { parse_mode: 'Markdown' });
+    logger.info(`Admin requested chat info for ${chatId}`);
+  } catch (error) {
+    logger.error('Error fetching chat info:', error);
+    await bot.sendMessage(chatId, '❌ Failed to fetch chat information. Please try again.');
+  }
+}
+
