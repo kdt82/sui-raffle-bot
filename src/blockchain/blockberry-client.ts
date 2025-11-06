@@ -71,7 +71,13 @@ class BlockberryClient {
       throw new Error('Blockberry client called without BLOCKBERRY_API_KEY');
     }
 
-    const limit = options.limit ?? Number(process.env.BLOCKBERRY_POLL_LIMIT || DEFAULT_LIMIT);
+    const rawLimit = process.env.BLOCKBERRY_POLL_LIMIT || String(DEFAULT_LIMIT);
+    const limit = options.limit ?? parseInt(rawLimit, 10);
+    
+    if (isNaN(limit) || limit <= 0) {
+      throw new Error(`Invalid BLOCKBERRY_POLL_LIMIT: ${rawLimit}`);
+    }
+
     const params = new URLSearchParams();
     params.set(this.pageParam, '0');
     params.set(this.sizeParam, String(limit));
