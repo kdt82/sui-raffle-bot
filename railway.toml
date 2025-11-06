@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npx prisma generate && npx prisma db push --accept-data-loss"
+buildCommand = "npm install && npx prisma db push --accept-data-loss --skip-generate && npx prisma generate"
 
 [deploy]
 startCommand = "npm run start"

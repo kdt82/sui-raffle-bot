@@ -439,6 +439,9 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
           },
         },
       },
+    }).catch((err) => {
+      logger.error('Prisma query error in config:', err);
+      throw new Error('Database query failed - schema might be out of sync');
     });
 
     if (!activeRaffle) {
@@ -449,6 +452,9 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
     const totalTickets = await prisma.ticket.aggregate({
       where: { raffleId: activeRaffle.id },
       _sum: { ticketCount: true },
+    }).catch((err) => {
+      logger.error('Prisma aggregate error in config:', err);
+      return { _sum: { ticketCount: 0 } };
     });
 
     // Handle minimumPurchase safely (field might not exist yet if migration hasn't run)
@@ -480,7 +486,16 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
     await bot.sendMessage(chatId, configMessage, { parse_mode: 'Markdown' });
   } catch (error) {
     logger.error('Error fetching config:', error);
-    await bot.sendMessage(chatId, '❌ Error fetching configuration. Please try again.');
+    
+    // Provide more detailed error message
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    await bot.sendMessage(
+      chatId, 
+      `❌ Error fetching configuration.\n\n` +
+      `This usually means the database schema needs to be updated.\n` +
+      `The bot is redeploying now - please try again in 2-3 minutes.\n\n` +
+      `Error: ${errorMsg}`
+    );
   }
 }
 
