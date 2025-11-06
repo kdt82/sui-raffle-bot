@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
@@ -149,6 +149,8 @@ export function registerAdminHandlers(): void {
     });
   });
 
+  // Temporarily removed: /set_minimum_purchase
+  /*
   bot.onText(/\/set_minimum_purchase/, async (msg) => {
     await requireAdminPrivate(msg, async () => {
       try {
@@ -158,6 +160,7 @@ export function registerAdminHandlers(): void {
       }
     });
   });
+  */
 
   bot.onText(/\/upload_media/, async (msg) => {
     await requireAdminPrivate(msg, async () => {

@@ -206,77 +206,12 @@ export async function handleSetPrize(msg: TelegramBot.Message): Promise<void> {
   }
 }
 
+// Temporarily removed minimum purchase feature - restoring production
+/*
 export async function handleSetMinimumPurchase(msg: TelegramBot.Message): Promise<void> {
-  const chatId = msg.chat.id;
-  const args = msg.text?.split(' ').slice(1) || [];
-
-  if (args.length === 0) {
-    await bot.sendMessage(
-      chatId,
-      `📝 **Set Minimum Purchase**\n\n` +
-      `Usage: \`/set_minimum_purchase <amount>\`\n\n` +
-      `Set the minimum token purchase amount to earn tickets.\n` +
-      `Purchases below this amount will not earn tickets.\n\n` +
-      `**Examples:**\n` +
-      `• \`/set_minimum_purchase 10\` - Set minimum to 10 tokens\n` +
-      `• \`/set_minimum_purchase 0.5\` - Set minimum to 0.5 tokens\n` +
-      `• \`/set_minimum_purchase 0\` - Remove minimum\n\n` +
-      `⚠️ **Note:** Amount should be in **token units** (not raw units)\n` +
-      `For example, if your token has 9 decimals:\n` +
-      `• 1 token = 1,000,000,000 raw units\n` +
-      `• Use "1" not "1000000000"`,
-      { parse_mode: 'Markdown' }
-    );
-    return;
-  }
-
-  const minimumAmount = args[0];
-
-  if (isNaN(parseFloat(minimumAmount)) || parseFloat(minimumAmount) < 0) {
-    await bot.sendMessage(chatId, '❌ Invalid amount. Must be a number greater than or equal to 0.');
-    return;
-  }
-
-  try {
-    const activeRaffle = await prisma.raffle.findFirst({
-      where: {
-        status: RAFFLE_STATUS.ACTIVE,
-        endTime: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!activeRaffle) {
-      await bot.sendMessage(chatId, '❌ No active raffle found.');
-      return;
-    }
-
-    const minimumValue = parseFloat(minimumAmount) === 0 ? null : minimumAmount;
-
-    await prisma.raffle.update({
-      where: { id: activeRaffle.id },
-      data: {
-        minimumPurchase: minimumValue,
-      },
-    });
-
-    const message = minimumValue
-      ? `✅ **Minimum purchase updated!**\n\n` +
-        `Raffle ID: \`${activeRaffle.id}\`\n` +
-        `Minimum Purchase: **${minimumValue} tokens**\n\n` +
-        `Purchases below this amount will not earn tickets.\n\n` +
-        `To remove the minimum, use: \`/set_minimum_purchase 0\``
-      : `✅ **Minimum purchase removed!**\n\n` +
-        `Raffle ID: \`${activeRaffle.id}\`\n` +
-        `All purchases will now earn tickets.\n\n` +
-        `To set a minimum, use: \`/set_minimum_purchase <amount>\``;
-
-    await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-  } catch (error) {
-    logger.error('Error setting minimum purchase:', error);
-    await bot.sendMessage(chatId, '❌ Error setting minimum purchase. Please try again.');
-  }
+  // Feature temporarily disabled during emergency rollback
 }
+*/
 
 export async function handleUploadMedia(msg: TelegramBot.Message): Promise<void> {
   const chatId = msg.chat.id;
@@ -457,12 +392,6 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
       return { _sum: { ticketCount: 0 } };
     });
 
-    // Handle minimumPurchase safely (field might not exist yet if migration hasn't run)
-    const minimumPurchase = (activeRaffle as any).minimumPurchase;
-    const minimumText = minimumPurchase 
-      ? `Minimum Purchase: ${minimumPurchase} tokens` 
-      : 'Minimum Purchase: None (all purchases earn tickets)';
-
     const configMessage = `⚙️ **Raffle Configuration**\n\n` +
       `**ID:** \`${activeRaffle.id}\`\n` +
       `**Contract Address:** \`${activeRaffle.ca}\`\n` +
@@ -470,7 +399,6 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
       `**Start Time:** ${activeRaffle.startTime.toLocaleString()}\n` +
       `**End Time:** ${activeRaffle.endTime.toLocaleString()}\n` +
       `**Prize:** ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}\n` +
-      `**${minimumText}**\n` +
       `**Status:** ${activeRaffle.status}\n\n` +
       `📊 **Statistics:**\n` +
       `• Total Buy Events: ${activeRaffle._count.buyEvents}\n` +

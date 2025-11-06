@@ -11,19 +11,18 @@ datasource db {
 }
 
 model Raffle {
-  id              String   @id @default(cuid())
-  ca              String   // Contract address to monitor
-  dex             String   // DEX name: cetus, turbos, 7kag, dexscreener, suidex
-  startTime       DateTime @default(now())
-  endTime         DateTime
-  prizeType       String   // USDC, AQUA, or SUI
-  prizeAmount     String   // Amount as string to handle decimals
-  minimumPurchase String?  // Minimum token purchase amount (optional)
-  mediaUrl        String?  // Telegram file ID or URL
-  mediaType       String?  // image, video, gif
-  status          String   @default("active") // active, ended, winner_selected
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(cuid())
+  ca          String   // Contract address to monitor
+  dex         String   // DEX name: cetus, turbos, 7kag, dexscreener, suidex
+  startTime   DateTime @default(now())
+  endTime     DateTime
+  prizeType   String   // USDC, AQUA, or SUI
+  prizeAmount String   // Amount as string to handle decimals
+  mediaUrl    String?  // Telegram file ID or URL
+  mediaType   String?  // image, video, gif
+  status      String   @default("active") // active, ended, winner_selected
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   tickets   Ticket[]
   buyEvents BuyEvent[]
