@@ -757,10 +757,22 @@ export class BuyDetector {
       // Check minimum purchase requirement
       if (this.activeRaffle?.minimumPurchase) {
         const minimumRequired = parseFloat(this.activeRaffle.minimumPurchase);
-        const purchaseAmount = parseFloat(data.tokenAmount);
+        
+        // Use rawAmount for comparison if available (more accurate)
+        let purchaseAmount: number;
+        if (data.rawAmount && data.decimals !== undefined) {
+          const rawBigInt = BigInt(data.rawAmount);
+          const scale = BigInt(10) ** BigInt(data.decimals);
+          purchaseAmount = Number(rawBigInt) / Number(scale);
+        } else {
+          purchaseAmount = parseFloat(data.tokenAmount);
+        }
         
         if (!isNaN(minimumRequired) && !isNaN(purchaseAmount) && purchaseAmount < minimumRequired) {
-          logger.info(`Purchase ${purchaseAmount} is below minimum ${minimumRequired}, no tickets awarded`);
+          logger.info(`Purchase ${purchaseAmount} tokens is below minimum ${minimumRequired} tokens, no tickets awarded`, {
+            wallet: data.walletAddress,
+            txHash: data.transactionHash,
+          });
           return 0;
         }
       }

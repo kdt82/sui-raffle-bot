@@ -213,11 +213,19 @@ export async function handleSetMinimumPurchase(msg: TelegramBot.Message): Promis
   if (args.length === 0) {
     await bot.sendMessage(
       chatId,
-      `📝 Usage: /set_minimum_purchase <amount>\n\n` +
-      `Example: /set_minimum_purchase 10\n\n` +
+      `📝 **Set Minimum Purchase**\n\n` +
+      `Usage: \`/set_minimum_purchase <amount>\`\n\n` +
       `Set the minimum token purchase amount to earn tickets.\n` +
       `Purchases below this amount will not earn tickets.\n\n` +
-      `To remove the minimum, use: /set_minimum_purchase 0`
+      `**Examples:**\n` +
+      `• \`/set_minimum_purchase 10\` - Set minimum to 10 tokens\n` +
+      `• \`/set_minimum_purchase 0.5\` - Set minimum to 0.5 tokens\n` +
+      `• \`/set_minimum_purchase 0\` - Remove minimum\n\n` +
+      `⚠️ **Note:** Amount should be in **token units** (not raw units)\n` +
+      `For example, if your token has 9 decimals:\n` +
+      `• 1 token = 1,000,000,000 raw units\n` +
+      `• Use "1" not "1000000000"`,
+      { parse_mode: 'Markdown' }
     );
     return;
   }
@@ -253,15 +261,17 @@ export async function handleSetMinimumPurchase(msg: TelegramBot.Message): Promis
     });
 
     const message = minimumValue
-      ? `✅ Minimum purchase updated!\n\n` +
-        `Raffle ID: ${activeRaffle.id}\n` +
-        `Minimum Purchase: ${minimumValue} tokens\n\n` +
-        `Purchases below this amount will not earn tickets.`
-      : `✅ Minimum purchase removed!\n\n` +
-        `Raffle ID: ${activeRaffle.id}\n` +
-        `All purchases will now earn tickets.`;
+      ? `✅ **Minimum purchase updated!**\n\n` +
+        `Raffle ID: \`${activeRaffle.id}\`\n` +
+        `Minimum Purchase: **${minimumValue} tokens**\n\n` +
+        `Purchases below this amount will not earn tickets.\n\n` +
+        `To remove the minimum, use: \`/set_minimum_purchase 0\``
+      : `✅ **Minimum purchase removed!**\n\n` +
+        `Raffle ID: \`${activeRaffle.id}\`\n` +
+        `All purchases will now earn tickets.\n\n` +
+        `To set a minimum, use: \`/set_minimum_purchase <amount>\``;
 
-    await bot.sendMessage(chatId, message);
+    await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
   } catch (error) {
     logger.error('Error setting minimum purchase:', error);
     await bot.sendMessage(chatId, '❌ Error setting minimum purchase. Please try again.');
@@ -442,20 +452,28 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
     });
 
     const minimumText = activeRaffle.minimumPurchase 
-      ? `\nMinimum Purchase: ${activeRaffle.minimumPurchase} tokens` 
-      : '';
+      ? `Minimum Purchase: ${activeRaffle.minimumPurchase} tokens` 
+      : 'Minimum Purchase: None (all purchases earn tickets)';
 
     const configMessage = `⚙️ **Raffle Configuration**\n\n` +
-      `ID: ${activeRaffle.id}\n` +
-      `Contract Address: ${activeRaffle.ca}\n` +
-      `DEX: ${activeRaffle.dex.toUpperCase()}\n` +
-      `Start Time: ${activeRaffle.startTime.toLocaleString()}\n` +
-      `End Time: ${activeRaffle.endTime.toLocaleString()}\n` +
-      `Prize: ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}${minimumText}\n` +
-      `Status: ${activeRaffle.status}\n` +
-      `Total Buy Events: ${activeRaffle._count.buyEvents}\n` +
-      `Total Tickets: ${totalTickets._sum.ticketCount || 0}\n` +
-      `Unique Wallets: ${activeRaffle._count.tickets}`;
+      `**ID:** \`${activeRaffle.id}\`\n` +
+      `**Contract Address:** \`${activeRaffle.ca}\`\n` +
+      `**DEX:** ${activeRaffle.dex.toUpperCase()}\n` +
+      `**Start Time:** ${activeRaffle.startTime.toLocaleString()}\n` +
+      `**End Time:** ${activeRaffle.endTime.toLocaleString()}\n` +
+      `**Prize:** ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}\n` +
+      `**${minimumText}**\n` +
+      `**Status:** ${activeRaffle.status}\n\n` +
+      `📊 **Statistics:**\n` +
+      `• Total Buy Events: ${activeRaffle._count.buyEvents}\n` +
+      `• Total Tickets: ${totalTickets._sum.ticketCount || 0}\n` +
+      `• Unique Wallets: ${activeRaffle._count.tickets}\n\n` +
+      `🔧 **Available Commands:**\n` +
+      `• \`/set_prize <type> <amount>\` - Change prize\n` +
+      `• \`/set_minimum_purchase <amount>\` - Change minimum (0 to remove)\n` +
+      `• \`/upload_media\` - Add/change raffle media\n` +
+      `• \`/reset_tickets\` - Reset all tickets (testing only)\n` +
+      `• \`/award_prize\` - Mark prize as awarded`;
 
     await bot.sendMessage(chatId, configMessage, { parse_mode: 'Markdown' });
   } catch (error) {

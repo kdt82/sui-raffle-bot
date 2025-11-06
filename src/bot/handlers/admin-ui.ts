@@ -317,6 +317,8 @@ async function handlePrizeAmountStep(msg: TelegramBot.Message, data: Record<stri
     `Step 5/5: Minimum Purchase (Optional)\n\n` +
     `Set a minimum token purchase amount to earn tickets.\n` +
     `Purchases below this amount will not earn tickets.\n\n` +
+    `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
+    `Example: Enter "10" for 10 tokens, not "10000000000"\n\n` +
     `Send the minimum amount, or click "Skip" for no minimum:`,
     {
       reply_markup: keyboard,
@@ -556,6 +558,8 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         `Step 5/5: Minimum Purchase (Optional)\n\n` +
         `Set a minimum token purchase amount to earn tickets.\n` +
         `Purchases below this amount will not earn tickets.\n\n` +
+        `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
+        `Example: Enter "10" for 10 tokens, not "10000000000"\n\n` +
         `Send the minimum amount, or click "Skip" for no minimum:`,
         {
           chat_id: chatId,
