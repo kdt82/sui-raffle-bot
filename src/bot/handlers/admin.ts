@@ -206,6 +206,68 @@ export async function handleSetPrize(msg: TelegramBot.Message): Promise<void> {
   }
 }
 
+export async function handleSetMinimumPurchase(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const args = msg.text?.split(' ').slice(1) || [];
+
+  if (args.length === 0) {
+    await bot.sendMessage(
+      chatId,
+      `📝 Usage: /set_minimum_purchase <amount>\n\n` +
+      `Example: /set_minimum_purchase 10\n\n` +
+      `Set the minimum token purchase amount to earn tickets.\n` +
+      `Purchases below this amount will not earn tickets.\n\n` +
+      `To remove the minimum, use: /set_minimum_purchase 0`
+    );
+    return;
+  }
+
+  const minimumAmount = args[0];
+
+  if (isNaN(parseFloat(minimumAmount)) || parseFloat(minimumAmount) < 0) {
+    await bot.sendMessage(chatId, '❌ Invalid amount. Must be a number greater than or equal to 0.');
+    return;
+  }
+
+  try {
+    const activeRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: RAFFLE_STATUS.ACTIVE,
+        endTime: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!activeRaffle) {
+      await bot.sendMessage(chatId, '❌ No active raffle found.');
+      return;
+    }
+
+    const minimumValue = parseFloat(minimumAmount) === 0 ? null : minimumAmount;
+
+    await prisma.raffle.update({
+      where: { id: activeRaffle.id },
+      data: {
+        minimumPurchase: minimumValue,
+      },
+    });
+
+    const message = minimumValue
+      ? `✅ Minimum purchase updated!\n\n` +
+        `Raffle ID: ${activeRaffle.id}\n` +
+        `Minimum Purchase: ${minimumValue} tokens\n\n` +
+        `Purchases below this amount will not earn tickets.`
+      : `✅ Minimum purchase removed!\n\n` +
+        `Raffle ID: ${activeRaffle.id}\n` +
+        `All purchases will now earn tickets.`;
+
+    await bot.sendMessage(chatId, message);
+  } catch (error) {
+    logger.error('Error setting minimum purchase:', error);
+    await bot.sendMessage(chatId, '❌ Error setting minimum purchase. Please try again.');
+  }
+}
+
 export async function handleUploadMedia(msg: TelegramBot.Message): Promise<void> {
   const chatId = msg.chat.id;
   let mediaFileId: string | undefined;
@@ -379,13 +441,17 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
       _sum: { ticketCount: true },
     });
 
+    const minimumText = activeRaffle.minimumPurchase 
+      ? `\nMinimum Purchase: ${activeRaffle.minimumPurchase} tokens` 
+      : '';
+
     const configMessage = `⚙️ **Raffle Configuration**\n\n` +
       `ID: ${activeRaffle.id}\n` +
       `Contract Address: ${activeRaffle.ca}\n` +
       `DEX: ${activeRaffle.dex.toUpperCase()}\n` +
       `Start Time: ${activeRaffle.startTime.toLocaleString()}\n` +
       `End Time: ${activeRaffle.endTime.toLocaleString()}\n` +
-      `Prize: ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}\n` +
+      `Prize: ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}${minimumText}\n` +
       `Status: ${activeRaffle.status}\n` +
       `Total Buy Events: ${activeRaffle._count.buyEvents}\n` +
       `Total Tickets: ${totalTickets._sum.ticketCount || 0}\n` +

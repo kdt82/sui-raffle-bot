@@ -39,7 +39,7 @@ export async function handleCreateRaffleUI(msg: TelegramBot.Message): Promise<vo
   await bot.sendMessage(
     chatId,
     `🎰 **Create New Raffle**\n\n` +
-    `Step 1/4: Contract Address\n\n` +
+    `Step 1/5: Contract Address\n\n` +
     `Please send the contract address (CA) of the token to monitor.\n\n` +
     `Example: \`0x1234567890abcdef...\``,
     {
@@ -157,6 +157,9 @@ export async function handleCreateRaffleStep(
     case 'create_raffle_prize_amount':
       await handlePrizeAmountStep(msg, data);
       break;
+    case 'create_raffle_minimum_purchase':
+      await handleMinimumPurchaseStep(msg, data);
+      break;
     case 'create_raffle_review':
       await handleReviewStep(msg, data);
       break;
@@ -189,7 +192,7 @@ async function handleContractAddressStep(msg: TelegramBot.Message, data: Record<
   await bot.sendMessage(
     chatId,
     `✅ Contract Address: \`${contractAddress}\`\n\n` +
-    `Step 2/4: End Time\n\n` +
+    `Step 2/5: End Time\n\n` +
     `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
     `Example: 31/12/2024 23:59:59`,
     {
@@ -273,7 +276,7 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
   await bot.sendMessage(
     chatId,
     `✅ End Time: ${endTime.toLocaleString()}\n\n` +
-    `Step 3/4: Prize Type\n\n` +
+    `Step 3/5: Prize Type\n\n` +
     `Select the prize type:`,
     {
       reply_markup: keyboard,
@@ -297,6 +300,42 @@ async function handlePrizeAmountStep(msg: TelegramBot.Message, data: Record<stri
 
   data.prizeAmount = prizeAmount;
   conversationManager.updateConversation(userId, chatId, {
+    step: 'create_raffle_minimum_purchase',
+    data,
+  });
+
+  const keyboard: TelegramBot.InlineKeyboardMarkup = {
+    inline_keyboard: [
+      [{ text: '⏭️ Skip (No Minimum)', callback_data: 'skip_minimum_purchase' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_prize_type' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+    ],
+  };
+
+  await bot.sendMessage(
+    chatId,
+    `✅ Prize Amount: ${prizeAmount}\n\n` +
+    `Step 5/5: Minimum Purchase (Optional)\n\n` +
+    `Set a minimum token purchase amount to earn tickets.\n` +
+    `Purchases below this amount will not earn tickets.\n\n` +
+    `Send the minimum amount, or click "Skip" for no minimum:`,
+    {
+      reply_markup: keyboard,
+    }
+  );
+}
+
+async function handleMinimumPurchaseStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
+  const minimumPurchase = msg.text?.trim();
+
+  if (!minimumPurchase || isNaN(parseFloat(minimumPurchase)) || parseFloat(minimumPurchase) <= 0) {
+    await bot.sendMessage(chatId, '❌ Please send a valid minimum purchase amount (number greater than 0), or click "Skip".');
+    return;
+  }
+
+  data.minimumPurchase = minimumPurchase;
+  conversationManager.updateConversation(userId, chatId, {
     step: 'create_raffle_review',
     data,
   });
@@ -312,12 +351,16 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
       [{ text: '✅ Confirm & Create', callback_data: 'confirm_create_raffle' }],
-      [{ text: '🔙 Back', callback_data: 'back_to_prize_amount' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_minimum_purchase' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
   };
 
   const dexValue = typeof data.dex === 'string' && data.dex.length > 0 ? data.dex : DEFAULT_DEX;
   const dexDisplay = getDexDisplayName(dexValue as DexType).toUpperCase();
+  
+  const minimumText = data.minimumPurchase 
+    ? `\nMinimum Purchase: ${data.minimumPurchase} tokens` 
+    : '\nMinimum Purchase: None';
 
   await bot.sendMessage(
     chatId,
@@ -325,7 +368,7 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     `Contract Address: \`${data.contractAddress}\`\n` +
     `Data: ${dexDisplay}\n` +
     `Prize Type: ${data.prizeType}\n` +
-    `Prize Amount: ${data.prizeAmount}\n\n` +
+    `Prize Amount: ${data.prizeAmount}${minimumText}\n\n` +
     `Please review and confirm:`,
     {
       parse_mode: 'Markdown',
@@ -368,7 +411,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id, { text: `Selected ${prizeType}` });
       await bot.editMessageText(
         `✅ Prize Type: ${prizeType}\n\n` +
-        `Step 4/4: Prize Amount\n\n` +
+        `Step 4/5: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
@@ -380,6 +423,17 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
           },
         }
       );
+      return;
+    }
+
+    if (callbackData === 'skip_minimum_purchase') {
+      conversation.data.minimumPurchase = null;
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_review',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: 'Skipped minimum purchase' });
+      await showReviewStep(chatId, conversation.data);
       return;
     }
 
@@ -476,7 +530,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
         `✅ Prize Type: ${conversation.data.prizeType}\n\n` +
-        `Step 4/4: Prize Amount\n\n` +
+        `Step 4/5: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
@@ -484,6 +538,32 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
           reply_markup: {
             inline_keyboard: [
               [{ text: '🔙 Back', callback_data: 'back_to_prize_type' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'back_to_minimum_purchase') {
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_minimum_purchase',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id);
+      await bot.editMessageText(
+        `✅ Prize Amount: ${conversation.data.prizeAmount}\n\n` +
+        `Step 5/5: Minimum Purchase (Optional)\n\n` +
+        `Set a minimum token purchase amount to earn tickets.\n` +
+        `Purchases below this amount will not earn tickets.\n\n` +
+        `Send the minimum amount, or click "Skip" for no minimum:`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏭️ Skip (No Minimum)', callback_data: 'skip_minimum_purchase' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_prize_amount' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
             ],
           },
         }
@@ -506,9 +586,14 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         endTime: new Date(data.endTime),
         prizeType: data.prizeType,
         prizeAmount: data.prizeAmount,
+        minimumPurchase: data.minimumPurchase || null,
         status: RAFFLE_STATUS.ACTIVE,
       },
     });
+
+    const minimumText = raffle.minimumPurchase 
+      ? `\nMinimum Purchase: ${raffle.minimumPurchase} tokens` 
+      : '';
 
     await bot.sendMessage(
       chatId,
@@ -517,7 +602,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       `Contract Address: \`${raffle.ca}\`\n` +
       `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
       `Ends: ${raffle.endTime.toLocaleString()}\n` +
-      `Prize: ${raffle.prizeAmount} ${raffle.prizeType}`,
+      `Prize: ${raffle.prizeAmount} ${raffle.prizeType}${minimumText}`,
       { parse_mode: 'Markdown' }
     );
   } catch (error) {

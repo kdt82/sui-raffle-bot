@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
@@ -145,6 +145,16 @@ export function registerAdminHandlers(): void {
         await handleSetPrize(msg);
       } catch (error) {
         logger.error('Error handling /set_prize command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/set_minimum_purchase/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleSetMinimumPurchase(msg);
+      } catch (error) {
+        logger.error('Error handling /set_minimum_purchase command:', error);
       }
     });
   });

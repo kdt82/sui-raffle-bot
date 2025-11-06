@@ -41,7 +41,7 @@ interface NormalizedBlockberryTrade {
 }
 
 export class BuyDetector {
-  private activeRaffle: { id: string; ca: string } | null = null;
+  private activeRaffle: { id: string; ca: string; minimumPurchase?: string | null } | null = null;
   private rafflePollInterval: NodeJS.Timeout | null = null;
   private onChainPollInterval: NodeJS.Timeout | null = null;
   private processedEventIds: Set<string> = new Set();
@@ -84,7 +84,11 @@ export class BuyDetector {
           this.activeRaffle.id !== raffle.id ||
           this.activeRaffle.ca !== raffle.ca;
 
-        this.activeRaffle = { id: raffle.id, ca: raffle.ca };
+        this.activeRaffle = { 
+          id: raffle.id, 
+          ca: raffle.ca,
+          minimumPurchase: raffle.minimumPurchase 
+        };
 
         if (hasChanged) {
           logger.info(`Active raffle found: ${raffle.id}, monitoring CA: ${raffle.ca} via on-chain transfers`);
@@ -750,6 +754,17 @@ export class BuyDetector {
 
   private calculateTicketCount(data: BuyEventData): number {
     try {
+      // Check minimum purchase requirement
+      if (this.activeRaffle?.minimumPurchase) {
+        const minimumRequired = parseFloat(this.activeRaffle.minimumPurchase);
+        const purchaseAmount = parseFloat(data.tokenAmount);
+        
+        if (!isNaN(minimumRequired) && !isNaN(purchaseAmount) && purchaseAmount < minimumRequired) {
+          logger.info(`Purchase ${purchaseAmount} is below minimum ${minimumRequired}, no tickets awarded`);
+          return 0;
+        }
+      }
+
       if (data.rawAmount && data.decimals !== undefined) {
         const amount = BigInt(data.rawAmount);
         const multiplier = BigInt(TICKETS_PER_TOKEN);
@@ -961,6 +976,10 @@ export class BuyDetector {
 
       const shortWallet = `${data.walletAddress.slice(0, 6)}...${data.walletAddress.slice(-4)}`;
 
+      const minimumText = raffle.minimumPurchase 
+        ? `\n💎 Minimum Purchase: \`${raffle.minimumPurchase}\` tokens` 
+        : '';
+
       const message =
         `🎉 *NEW BUY DETECTED!* 🎉\n\n` +
         `💰 Amount: \`${data.tokenAmount}\` tokens\n` +
@@ -968,7 +987,7 @@ export class BuyDetector {
         `👛 Wallet: \`${shortWallet}\`\n` +
         `🔗 Source: \`On-chain\`\n\n` +
         `🏆 Prize Pool: \`${raffle.prizeAmount} ${raffle.prizeType}\`\n` +
-        `⏰ Raffle Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC\n\n` +
+        `⏰ Raffle Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC${minimumText}\n\n` +
         `_Every 1 token purchased = 100 raffle tickets!_`;
 
       if (raffle.mediaUrl && raffle.mediaType) {

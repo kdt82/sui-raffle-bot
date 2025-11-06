@@ -63,6 +63,7 @@ npm run dev
 ### Admin Commands
 - `/create_raffle` - Create a new raffle (requires DEX selection)
 - `/set_prize` - Set prize details for active raffle
+- `/set_minimum_purchase <amount>` - Set minimum token purchase to earn tickets
 - `/upload_media` - Upload media for raffle
 - `/award_prize` - Award prize to winner
 - `/config` - Configure raffle settings
