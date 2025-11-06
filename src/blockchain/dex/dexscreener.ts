@@ -1,15 +1,31 @@
 import { logger } from '../../utils/logger';
 import { DexIntegration, BuyEventData } from './base';
+import { CetusIntegration } from './cetus';
+import { TurbosIntegration } from './turbos';
+import { SevenKAgIntegration } from './7kag';
+import { SuiDexIntegration } from './suidex';
 
-// DexScreener API integration
-// DexScreener doesn't have direct on-chain events, so we'll use their API
+type DexScreenerPair = {
+  pairAddress: string;
+  dexId: string;
+  chainId: string;
+  liquidity?: { usd?: number };
+};
+
 const DEXSCREENER_API_URL = 'https://api.dexscreener.com/latest/dex';
+
+const SUPPORTED_PROXIES: Record<string, () => DexIntegration> = {
+  cetus: () => new CetusIntegration(),
+  turbos: () => new TurbosIntegration(),
+  '7kag': () => new SevenKAgIntegration(),
+  suidex: () => new SuiDexIntegration(),
+};
 
 export class DexScreenerIntegration implements DexIntegration {
   name = 'dexscreener';
   private monitoring = false;
-  private pollingInterval: NodeJS.Timeout | null = null;
-  private lastCheckedTx: string | null = null;
+  private proxiedIntegration: DexIntegration | null = null;
+  private proxiedDexId: string | null = null;
 
   async monitor(tokenAddress: string, callback: (buyEvent: BuyEventData) => Promise<void>): Promise<void> {
     if (this.monitoring) {
@@ -17,57 +33,94 @@ export class DexScreenerIntegration implements DexIntegration {
       return;
     }
 
-    this.monitoring = true;
     logger.info(`Starting DexScreener monitoring for token: ${tokenAddress}`);
 
-    // Poll DexScreener API for recent transactions
-    this.pollingInterval = setInterval(async () => {
-      try {
-        await this.checkForNewBuys(tokenAddress, callback);
-      } catch (error) {
-        logger.error('Error polling DexScreener:', error);
+    try {
+      const pair = await this.findBestPair(tokenAddress);
+      if (!pair) {
+        logger.warn(`DexScreener: no suitable pair found for token ${tokenAddress}`);
+        return;
       }
-    }, 15000); // Poll every 15 seconds
+
+      const normalizedDexId = typeof pair.dexId === 'string' ? pair.dexId.toLowerCase() : '';
+      const proxyFactory = SUPPORTED_PROXIES[normalizedDexId];
+      if (!proxyFactory) {
+        logger.warn(
+          `DexScreener: unsupported dexId ${pair.dexId} for token ${tokenAddress}. Supported: ${Object.keys(
+            SUPPORTED_PROXIES
+          ).join(', ')}`,
+        );
+        return;
+      }
+
+      this.proxiedIntegration = proxyFactory();
+      this.proxiedDexId = normalizedDexId;
+      this.monitoring = true;
+
+      logger.info(
+        `DexScreener: delegating monitoring for ${tokenAddress} to ${this.proxiedDexId} integration (pair ${pair.pairAddress})`,
+      );
+
+      await this.proxiedIntegration.monitor(tokenAddress, callback);
+    } catch (error) {
+      logger.error('DexScreener monitor error:', error);
+      this.monitoring = false;
+      this.proxiedIntegration = null;
+      this.proxiedDexId = null;
+    }
   }
 
   async stop(): Promise<void> {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
+    if (this.proxiedIntegration) {
+      try {
+        await this.proxiedIntegration.stop();
+      } catch (error) {
+        logger.error('Error stopping proxied DexScreener integration:', error);
+      }
     }
+
     this.monitoring = false;
+    this.proxiedIntegration = null;
+    this.proxiedDexId = null;
     logger.info('DexScreener monitoring stopped');
   }
 
-  private async checkForNewBuys(
-    tokenAddress: string,
-    callback: (buyEvent: BuyEventData) => Promise<void>
-  ): Promise<void> {
+  private async findBestPair(tokenAddress: string): Promise<DexScreenerPair | null> {
     try {
-      // Fetch token pair data from DexScreener
       const response = await fetch(`${DEXSCREENER_API_URL}/tokens/${tokenAddress}`);
-      const data: any = await response.json();
 
-      if (data.pairs && data.pairs.length > 0) {
-        // Get recent transactions from pairs
-        // Note: DexScreener API may not provide direct transaction data
-        // This would need to be adapted based on actual API structure
-        
-        for (const pair of data.pairs) {
-          // Check for new transactions
-          // This is a placeholder - actual implementation would parse transaction data
-          logger.debug('DexScreener pair data:', pair);
-          
-          // TODO: Parse pair transactions and extract buy events
-          // This would involve:
-          // 1. Checking pair transactions
-          // 2. Filtering for buys of the target token
-          // 3. Extracting wallet address and token amount
-          // 4. Calling callback with BuyEventData
-        }
+      if (!response.ok) {
+        logger.warn(`DexScreener API returned ${response.status} for token ${tokenAddress}`);
+        return null;
       }
+
+      const data: any = await response.json();
+      if (!data?.pairs?.length) {
+        return null;
+      }
+
+      const pairs: DexScreenerPair[] = data.pairs
+        .filter((pair: any) => {
+          const dexId = typeof pair?.dexId === 'string' ? pair.dexId.toLowerCase() : '';
+          return dexId && SUPPORTED_PROXIES[dexId];
+        })
+        .map((pair: any) => ({
+          pairAddress: pair.pairAddress,
+          dexId: pair.dexId,
+          chainId: pair.chainId,
+          liquidity: pair.liquidity,
+        }));
+
+      if (!pairs.length) {
+        return null;
+      }
+
+      // Prefer highest liquidity pair
+      pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+      return pairs[0];
     } catch (error) {
-      logger.error('Error fetching DexScreener data:', error);
+      logger.error('Error fetching DexScreener pair info:', error);
+      return null;
     }
   }
 }
