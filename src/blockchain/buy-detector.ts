@@ -75,6 +75,7 @@ export class BuyDetector {
       const raffle = await prisma.raffle.findFirst({
         where: {
           status: RAFFLE_STATUS.ACTIVE,
+          startTime: { lte: new Date() },
           endTime: { gt: new Date() },
         },
         orderBy: { createdAt: 'desc' },
