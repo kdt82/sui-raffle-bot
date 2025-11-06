@@ -386,103 +386,6 @@ export class BuyDetector {
 
     trades.forEach((trade, index) => {
       try {
-        const directionRaw = this.pickString(trade, [
-          'direction',
-          'side',
-          'tradeSide',
-          'swapSide',
-          'orderSide',
-        ]);
-        const direction = directionRaw?.toLowerCase();
-
-        const coinOutType = this.pickString(trade, [
-          'outCoin.coinType',
-          'outCoin.type',
-          'coinTypeOut',
-          'coin_type_out',
-          'tokenOut.coinType',
-          'tokenOutType',
-          'coinOut.coin_type',
-          'coinsOut.0.coinType',
-          'coins_out.0.coin_type',
-        ]);
-
-        const coinInType = this.pickString(trade, [
-          'inCoin.coinType',
-          'inCoin.type',
-          'coinTypeIn',
-          'coin_type_in',
-          'tokenIn.coinType',
-          'tokenInType',
-          'coinIn.coin_type',
-          'coinsIn.0.coinType',
-          'coins_in.0.coin_type',
-        ]);
-
-        const normalizedOut = coinOutType?.toLowerCase();
-        const normalizedIn = coinInType?.toLowerCase();
-
-        let isBuy = false;
-        if (direction === 'buy') {
-          isBuy = true;
-        } else if (direction === 'sell') {
-          isBuy = false;
-        } else if (normalizedOut && normalizedOut === normalizedTarget) {
-          isBuy = true;
-        } else if (normalizedIn && normalizedIn === normalizedTarget) {
-          isBuy = false;
-        } else if (normalizedOut?.includes(normalizedTarget)) {
-          isBuy = true;
-        } else if (normalizedIn?.includes(normalizedTarget)) {
-          isBuy = false;
-        } else {
-          // If direction is unknown and coin types do not match, skip the trade
-          return;
-        }
-
-        if (!isBuy) {
-          return;
-        }
-
-        const walletAddress = this.pickString(trade, [
-          'buyerAddress',
-          'buyer',
-          'accountAddress',
-          'walletAddress',
-          'traderAddress',
-          'trader',
-          'recipientAddress',
-          'toAddress',
-          'owner',
-          'userAddress',
-          'address',
-        ]);
-
-        if (!walletAddress) {
-          logger.debug('Blockberry trade missing wallet address', trade);
-          return;
-        }
-
-        const amountRaw = this.pickString(trade, [
-          'outCoin.amount',
-          'outCoin.amount_raw',
-          'amountOut',
-          'amount_out',
-          'tokenOutAmount',
-          'outAmount',
-          'amount',
-          'receivedAmount',
-          'amountReceived',
-          'coin.amount',
-          'coinsOut.0.amount',
-          'coins_out.0.amount_raw',
-        ]);
-
-        if (!amountRaw) {
-          logger.debug('Blockberry trade missing amount', trade);
-          return;
-        }
-
         const txDigest = this.pickString(trade, [
           'txDigest',
           'transactionDigest',
@@ -521,6 +424,174 @@ export class BuyDetector {
 
         const timestamp = this.parseTimestamp(timestampCandidate ?? timestampFallback ?? Date.now());
 
+        const balanceChanges = this.getNestedValue(trade, 'balanceChanges');
+        if (Array.isArray(balanceChanges) && balanceChanges.length > 0) {
+          let producedFromBalance = false;
+
+          balanceChanges.forEach((change: any, changeIndex: number) => {
+            if (!change || typeof change !== 'object') {
+              return;
+            }
+
+            const changeCoinType = this.pickString(change, ['coinType']);
+            if (!changeCoinType || changeCoinType.trim().toLowerCase() !== normalizedTarget) {
+              return;
+            }
+
+            const amountCandidate = this.pickString(change, ['amount']);
+            if (!amountCandidate) {
+              return;
+            }
+
+            let amountBigInt: bigint;
+            try {
+              amountBigInt = BigInt(amountCandidate);
+            } catch {
+              logger.debug('Blockberry balance change has non-numeric amount', {
+                amountCandidate,
+              });
+              return;
+            }
+
+            if (amountBigInt <= 0n) {
+              return;
+            }
+
+            const walletAddressFromChange = this.pickString(change, [
+              'owner.addressOwner',
+              'ownerAddress',
+              'addressOwner',
+            ]);
+
+            if (!walletAddressFromChange) {
+              logger.debug('Blockberry balance change missing wallet address', change);
+              return;
+            }
+
+            const decimalsFromChange = this.pickNumber(change, ['decimals']);
+            const eventKey = `${txDigest}:${walletAddressFromChange}:${changeIndex}`;
+
+            results.push({
+              txDigest,
+              eventKey,
+              timestamp,
+              walletAddress: walletAddressFromChange,
+              amountRaw: amountBigInt.toString(),
+              coinType: changeCoinType,
+              decimals: decimalsFromChange,
+            });
+
+            producedFromBalance = true;
+          });
+
+          if (producedFromBalance) {
+            return;
+          }
+        }
+
+        const directionRaw = this.pickString(trade, [
+          'direction',
+          'side',
+          'tradeSide',
+          'swapSide',
+          'orderSide',
+        ]);
+        const direction = directionRaw?.toLowerCase();
+
+        const coinOutType = this.pickString(trade, [
+          'outCoin.coinType',
+          'outCoin.type',
+          'coinTypeOut',
+          'coin_type_out',
+          'tokenOut.coinType',
+          'tokenOutType',
+          'coinOut.coin_type',
+          'coinsOut.0.coinType',
+          'coins_out.0.coin_type',
+          'coins.0.coinType',
+          'balanceChanges.0.coinType',
+        ]);
+
+        const coinInType = this.pickString(trade, [
+          'inCoin.coinType',
+          'inCoin.type',
+          'coinTypeIn',
+          'coin_type_in',
+          'tokenIn.coinType',
+          'tokenInType',
+          'coinIn.coin_type',
+          'coinsIn.0.coinType',
+          'coins_in.0.coin_type',
+          'coins.1.coinType',
+        ]);
+
+        const normalizedOut = coinOutType?.toLowerCase();
+        const normalizedIn = coinInType?.toLowerCase();
+
+        let isBuy = false;
+        if (direction === 'buy') {
+          isBuy = true;
+        } else if (direction === 'sell') {
+          isBuy = false;
+        } else if (normalizedOut && normalizedOut === normalizedTarget) {
+          isBuy = true;
+        } else if (normalizedIn && normalizedIn === normalizedTarget) {
+          isBuy = false;
+        } else if (normalizedOut?.includes(normalizedTarget)) {
+          isBuy = true;
+        } else if (normalizedIn?.includes(normalizedTarget)) {
+          isBuy = false;
+        } else {
+          return;
+        }
+
+        if (!isBuy) {
+          return;
+        }
+
+        const walletAddress = this.pickString(trade, [
+          'buyerAddress',
+          'buyer',
+          'accountAddress',
+          'walletAddress',
+          'traderAddress',
+          'trader',
+          'recipientAddress',
+          'toAddress',
+          'owner',
+          'userAddress',
+          'address',
+          'ownerAddress',
+          'owner.addressOwner',
+        ]);
+
+        if (!walletAddress) {
+          logger.debug('Blockberry trade missing wallet address', trade);
+          return;
+        }
+
+        const amountRaw = this.pickString(trade, [
+          'outCoin.amount',
+          'outCoin.amount_raw',
+          'amountOut',
+          'amount_out',
+          'tokenOutAmount',
+          'outAmount',
+          'amount',
+          'receivedAmount',
+          'amountReceived',
+          'coin.amount',
+          'coinsOut.0.amount',
+          'coins_out.0.amount_raw',
+          'coins.0.amount',
+          'balanceChanges.0.amount',
+        ]);
+
+        if (!amountRaw) {
+          logger.debug('Blockberry trade missing amount', trade);
+          return;
+        }
+
         const decimals = this.pickNumber(trade, [
           'outCoin.decimals',
           'coin.decimals',
@@ -529,6 +600,7 @@ export class BuyDetector {
           'decimalsOut',
           'coinsOut.0.decimals',
           'coins_out.0.decimals',
+          'coins.0.decimals',
         ]);
 
         const eventSeqCandidate = this.pickString(trade, [

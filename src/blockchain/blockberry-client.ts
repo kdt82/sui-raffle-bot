@@ -13,6 +13,13 @@ export interface BlockberryTradeResponse {
     nextCursor?: string | null;
     endCursor?: string | null;
   } | null;
+  number?: number | null;
+  last?: boolean;
+  pageable?: {
+    pageNumber?: number;
+    pageSize?: number;
+    offset?: number;
+  } | null;
 }
 
 export interface FetchTradesOptions {
@@ -21,28 +28,34 @@ export interface FetchTradesOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
-const DEFAULT_BASE_URL = 'https://api.blockberry.one/sui/v1';
-const DEFAULT_TRADES_PATH = 'defi/trades';
+const DEFAULT_BASE_URL = 'https://api.blockberry.one/sui';
+const DEFAULT_TRADES_PATH = 'v1/coins';
 const DEFAULT_LIMIT = 100;
-const DEFAULT_FILTER_PARAM = 'coinType';
-const DEFAULT_ORDER_PARAM = 'order';
-const DEFAULT_CURSOR_PARAM = 'cursor';
+const DEFAULT_PAGE_PARAM = 'page';
+const DEFAULT_SIZE_PARAM = 'size';
+const DEFAULT_ORDER_PARAM = 'orderBy';
+const DEFAULT_SORT_PARAM = 'sortBy';
+const DEFAULT_SORT_VALUE = 'AGE';
 
 class BlockberryClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly tradesPath: string;
-  private readonly filterParam: string;
+  private readonly pageParam: string;
+  private readonly sizeParam: string;
   private readonly orderParam: string;
-  private readonly cursorParam: string;
+  private readonly sortParam: string;
+  private readonly sortValue: string;
 
   constructor() {
     this.apiKey = process.env.BLOCKBERRY_API_KEY || '';
     this.baseUrl = (process.env.BLOCKBERRY_API_URL || DEFAULT_BASE_URL).replace(/\/+$/u, '');
     this.tradesPath = (process.env.BLOCKBERRY_TRADES_PATH || DEFAULT_TRADES_PATH).replace(/^\/+/, '');
-    this.filterParam = process.env.BLOCKBERRY_TRADES_FILTER_PARAM || DEFAULT_FILTER_PARAM;
+    this.pageParam = process.env.BLOCKBERRY_TRADES_PAGE_PARAM || DEFAULT_PAGE_PARAM;
+    this.sizeParam = process.env.BLOCKBERRY_TRADES_SIZE_PARAM || DEFAULT_SIZE_PARAM;
     this.orderParam = process.env.BLOCKBERRY_TRADES_ORDER_PARAM || DEFAULT_ORDER_PARAM;
-    this.cursorParam = process.env.BLOCKBERRY_TRADES_CURSOR_PARAM || DEFAULT_CURSOR_PARAM;
+    this.sortParam = process.env.BLOCKBERRY_TRADES_SORT_PARAM || DEFAULT_SORT_PARAM;
+    this.sortValue = process.env.BLOCKBERRY_TRADES_SORT_VALUE || DEFAULT_SORT_VALUE;
 
     if (!this.apiKey) {
       logger.warn('BLOCKBERRY_API_KEY not configured; Blockberry client will remain inactive');
@@ -60,28 +73,23 @@ class BlockberryClient {
 
     const limit = options.limit ?? Number(process.env.BLOCKBERRY_POLL_LIMIT || DEFAULT_LIMIT);
     const params = new URLSearchParams();
-    params.set(this.filterParam, tokenAddress);
-    params.set('limit', String(limit));
+    params.set(this.pageParam, '0');
+    params.set(this.sizeParam, String(limit));
+    params.set(this.orderParam, options.sortOrder === 'asc' ? 'ASC' : 'DESC');
+    params.set(this.sortParam, this.sortValue);
 
-    if (options.sortOrder) {
-      params.set(this.orderParam, options.sortOrder);
-    } else {
-      params.set(this.orderParam, 'desc');
-    }
-
-    if (options.cursor) {
-      params.set(this.cursorParam, options.cursor);
-    }
-
-    const url = `${this.baseUrl}/${this.tradesPath}?${params.toString()}`;
+    const encodedCoinType = encodeURIComponent(tokenAddress);
+    const url = `${this.baseUrl}/${this.tradesPath}/${encodedCoinType}/transactions?${params.toString()}`;
 
     try {
       const response = await fetch(url, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
           'X-API-KEY': this.apiKey,
         },
+        body: '{}',
       });
 
       if (!response.ok) {
@@ -94,18 +102,32 @@ class BlockberryClient {
         throw new Error(`Blockberry responded with ${response.status}: ${body.slice(0, 500)}`);
       }
 
-      const json = (await response.json()) as BlockberryTradeResponse | BlockberryRawTrade[];
+      const json = (await response.json()) as Record<string, any> | BlockberryRawTrade[];
 
       if (Array.isArray(json)) {
         return { data: json };
       }
 
-      if (!Array.isArray(json.data)) {
+      const data = Array.isArray(json.data)
+        ? json.data
+        : Array.isArray(json.content)
+          ? (json.content as BlockberryRawTrade[])
+          : [];
+
+      if (!Array.isArray(data)) {
         logger.warn('Blockberry trade response missing data array', json);
         return { data: [] };
       }
 
-      return json;
+      return {
+        data,
+        cursor: json.cursor ?? null,
+        nextCursor: json.nextCursor ?? null,
+        pageInfo: json.pageInfo ?? null,
+        number: typeof json.number === 'number' ? json.number : json.pageable?.pageNumber,
+        last: typeof json.last === 'boolean' ? json.last : undefined,
+        pageable: json.pageable ?? null,
+      };
     } catch (error) {
       logger.error('Failed to fetch trades from Blockberry', error);
       throw error;
