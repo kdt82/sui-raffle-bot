@@ -55,38 +55,56 @@ export class CetusIntegration implements DexIntegration {
     callback: (buyEvent: BuyEventData) => Promise<void>
   ): Promise<void> {
     try {
-      // Query recent events from Cetus package
+      // Query recent events from Cetus package (use Package filter, not MoveEventType)
       const events = await client.queryEvents({
         query: {
-          MoveEventType: `${CETUS_PACKAGE_ID}::pool::SwapEvent`,
+          Package: CETUS_PACKAGE_ID,
         },
         limit: 50,
         order: 'descending',
       });
 
-      logger.debug(`📥 Fetched ${events.data?.length || 0} recent Cetus swap events`);
+      const eventCount = events.data?.length || 0;
+      logger.info(`📥 Fetched ${eventCount} recent Cetus events`);
 
       if (!events.data || events.data.length === 0) {
+        logger.warn('⚠️ No events returned from Cetus query');
         return;
+      }
+
+      // Log first event as sample
+      if (events.data.length > 0) {
+        logger.info('🔬 Sample event type:', events.data[0].type);
       }
 
       // Process events in reverse order (oldest first)
       const eventsToProcess = events.data.reverse();
+      let processedCount = 0;
+      let skippedCount = 0;
 
       for (const event of eventsToProcess) {
         // Skip events we've already processed
         const eventTimestamp = parseInt(event.timestampMs || '0');
         if (eventTimestamp <= this.lastProcessedTimestamp) {
+          skippedCount++;
           continue;
         }
 
         const buyEvent = await this.parseSwapEvent(event, tokenAddress);
         if (buyEvent) {
           await callback(buyEvent);
+          processedCount++;
         }
 
         // Update last processed timestamp
         this.lastProcessedTimestamp = eventTimestamp;
+      }
+
+      if (processedCount > 0) {
+        logger.info(`✅ Processed ${processedCount} new buy events`);
+      }
+      if (skippedCount > 0) {
+        logger.debug(`⏩ Skipped ${skippedCount} already-processed events`);
       }
     } catch (error) {
       logger.error('❌ Error querying Cetus events:', error);
@@ -95,27 +113,26 @@ export class CetusIntegration implements DexIntegration {
 
   private async parseSwapEvent(event: any, targetTokenAddress: string): Promise<BuyEventData | null> {
     try {
-      // Log ALL events for debugging
-      logger.info('🔍 Received Cetus event:', { 
-        type: event.type, 
-        id: event.id?.txDigest,
-        hasData: !!event.parsedJson 
-      });
-      
-      // Check if this is a swap event
+      // Check if this is a swap event FIRST
       if (!event.type || !event.type.includes('Swap')) {
         return null;
       }
 
+      // Log event basics
+      logger.info('🔍 Processing Cetus Swap Event');
+      logger.info(`   Type: ${event.type}`);
+      logger.info(`   TX: ${event.id?.txDigest || 'unknown'}`);
+      logger.info(`   Has parsedJson: ${!!event.parsedJson}`);
+
       const parsedJson = event.parsedJson;
       if (!parsedJson) {
-        logger.debug('No parsed JSON in event');
+        logger.warn('❌ No parsedJson in swap event');
         return null;
       }
 
-      // Log the full event data for debugging
-      logger.info('📦 Cetus swap event data:', JSON.stringify(parsedJson, null, 2));
-      logger.info('🎯 Event type:', event.type);
+      // Log parsed data fields
+      logger.info('📦 Swap Data Fields:', Object.keys(parsedJson).join(', '));
+      logger.info('📦 Full Swap Data:', parsedJson);
 
       // Extract token addresses from the swap
       const eventType = event.type || '';
