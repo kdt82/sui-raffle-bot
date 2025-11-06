@@ -21,7 +21,7 @@ export interface FetchTradesOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
-const DEFAULT_BASE_URL = 'https://api.blockberry.one/v1/sui';
+const DEFAULT_BASE_URL = 'https://api.blockberry.one/sui/v1';
 const DEFAULT_TRADES_PATH = 'defi/trades';
 const DEFAULT_LIMIT = 100;
 const DEFAULT_FILTER_PARAM = 'coinType';
@@ -80,11 +80,16 @@ class BlockberryClient {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          'x-api-key': this.apiKey,
+          'X-API-KEY': this.apiKey,
         },
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          logger.debug('Blockberry returned 404 (likely no data yet)');
+          return { data: [] };
+        }
+
         const body = await response.text();
         throw new Error(`Blockberry responded with ${response.status}: ${body.slice(0, 500)}`);
       }

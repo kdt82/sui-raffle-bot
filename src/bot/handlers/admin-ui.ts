@@ -2,7 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
 import { prisma } from '../../utils/database';
 import { logger } from '../../utils/logger';
-import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX } from '../../utils/constants';
+import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX, getDexDisplayName, DexType } from '../../utils/constants';
 import { conversationManager } from '../conversation';
 
 // UI Mode: Interactive wizard with buttons
@@ -316,12 +316,14 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     ],
   };
 
+  const dexValue = typeof data.dex === 'string' && data.dex.length > 0 ? data.dex : DEFAULT_DEX;
+  const dexDisplay = getDexDisplayName(dexValue as DexType).toUpperCase();
+
   await bot.sendMessage(
     chatId,
     `📋 **Review Raffle Details**\n\n` +
     `Contract Address: \`${data.contractAddress}\`\n` +
-    `DEX: ${data.dex.toUpperCase()}\n` +
-    `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
+    `Data: ${dexDisplay}\n` +
     `Prize Type: ${data.prizeType}\n` +
     `Prize Amount: ${data.prizeAmount}\n\n` +
     `Please review and confirm:`,
