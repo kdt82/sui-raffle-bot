@@ -1,18 +1,20 @@
 export const TICKETS_PER_TOKEN = 100;
 export const PRIZE_TYPES = ['USDC', 'AQUA', 'SUI'] as const;
-export type PrizeType = typeof PRIZE_TYPES[number];
+export type PrizeType = (typeof PRIZE_TYPES)[number];
 
-export const DEX_OPTIONS = ['cetus', 'turbos', '7kag', 'dexscreener', 'suidex'] as const;
-export type DexType = typeof DEX_OPTIONS[number];
-export const DEFAULT_DEX: DexType = 'dexscreener';
+export const DEX_OPTIONS = ['blockberry', 'cetus', 'turbos', '7kag', 'dexscreener', 'suidex', 'onchain'] as const;
+export type DexType = (typeof DEX_OPTIONS)[number];
+export const DEFAULT_DEX: DexType = 'blockberry';
 
-export const DEX_NAMES = {
-  CETUS: 'cetus',
-  TURBOS: 'turbos',
-  SEVEN_K_AG: '7kag',
-  DEXSCREENER: 'dexscreener',
-  SUIDEX: 'suidex',
-} as const;
+export const DEX_NAMES: Record<DexType, string> = {
+  blockberry: 'Blockberry',
+  cetus: 'Cetus',
+  turbos: 'Turbos',
+  '7kag': '7k.ag',
+  dexscreener: 'DexScreener',
+  suidex: 'SuiDex',
+  onchain: 'On-chain',
+};
 
 export const RAFFLE_STATUS = {
   ACTIVE: 'active',
@@ -33,4 +35,18 @@ export const MEDIA_TYPES = {
 } as const;
 
 export type MediaType = typeof MEDIA_TYPES[keyof typeof MEDIA_TYPES];
+
+export const DEX_LABELS: Record<DexType, string> = {
+  blockberry: 'Blockberry',
+  cetus: 'Cetus',
+  turbos: 'Turbos',
+  '7kag': '7k.ag',
+  dexscreener: 'DexScreener',
+  suidex: 'SuiDex',
+  onchain: 'On-chain',
+};
+
+export function getDexDisplayName(dex: DexType): string {
+  return DEX_LABELS[dex] ?? dex;
+}
 
