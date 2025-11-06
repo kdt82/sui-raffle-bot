@@ -66,6 +66,7 @@ npm run dev
 - `/upload_media` - Upload media for raffle
 - `/award_prize` - Award prize to winner
 - `/config` - Configure raffle settings
+- `/reset_tickets` - Reset all tickets and buy events for active raffle (testing only)
 - `/analytics [days]` - View analytics summary (default: 7 days)
 - `/analytics_raffles` - Compare raffle performance
 - `/analytics_export [days]` - Export analytics to CSV (default: 30 days)

@@ -432,3 +432,55 @@ export async function handleChatInfo(msg: TelegramBot.Message): Promise<void> {
   }
 }
 
+export async function handleResetTickets(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+
+  try {
+    // Find active raffle
+    const activeRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: RAFFLE_STATUS.ACTIVE,
+      },
+      include: {
+        tickets: true,
+        buyEvents: true,
+      },
+    });
+
+    if (!activeRaffle) {
+      await bot.sendMessage(chatId, '❌ No active raffle found to reset tickets.');
+      return;
+    }
+
+    const ticketCount = activeRaffle.tickets.length;
+    const buyEventCount = activeRaffle.buyEvents.length;
+
+    // Delete all tickets for this raffle
+    await prisma.ticket.deleteMany({
+      where: { raffleId: activeRaffle.id },
+    });
+
+    // Delete all buy events for this raffle
+    await prisma.buyEvent.deleteMany({
+      where: { raffleId: activeRaffle.id },
+    });
+
+    await bot.sendMessage(
+      chatId,
+      `✅ *Tickets Reset Successfully!*\n\n` +
+      `🎫 Deleted ${ticketCount} ticket records\n` +
+      `📊 Deleted ${buyEventCount} buy events\n\n` +
+      `Raffle ID: \`${activeRaffle.id}\`\n` +
+      `Contract: \`${activeRaffle.ca.slice(0, 10)}...${activeRaffle.ca.slice(-6)}\`\n` +
+      `DEX: ${activeRaffle.dex.toUpperCase()}\n\n` +
+      `The raffle is still active and will continue to track new buys.`,
+      { parse_mode: 'Markdown' }
+    );
+
+    logger.info(`Admin reset tickets for raffle: ${activeRaffle.id} (${ticketCount} tickets, ${buyEventCount} events)`);
+  } catch (error) {
+    logger.error('Error resetting tickets:', error);
+    await bot.sendMessage(chatId, '❌ Failed to reset tickets. Please try again.');
+  }
+}
+

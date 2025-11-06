@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
@@ -125,6 +125,16 @@ export function registerAdminHandlers(): void {
         await handleCancelRaffle(msg);
       } catch (error) {
         logger.error('Error handling /cancel_raffle command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/reset_tickets/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleResetTickets(msg);
+      } catch (error) {
+        logger.error('Error handling /reset_tickets command:', error);
       }
     });
   });

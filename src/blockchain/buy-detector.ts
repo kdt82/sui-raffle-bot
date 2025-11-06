@@ -962,13 +962,13 @@ export class BuyDetector {
       const shortWallet = `${data.walletAddress.slice(0, 6)}...${data.walletAddress.slice(-4)}`;
 
       const message =
-        `?? *NEW BUY DETECTED!* ??\n\n` +
-        `?? Amount: \`${data.tokenAmount}\` tokens\n` +
-        `??? Tickets Earned: \`${buyEvent.ticketCount}\`\n` +
-        `?? Wallet: \`${shortWallet}\`\n` +
-        `?? Source: \`On-chain\`\n\n` +
-        `?? Prize Pool: \`${raffle.prizeAmount} ${raffle.prizeType}\`\n` +
-        `? Raffle Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC\n\n` +
+        `🎉 *NEW BUY DETECTED!* 🎉\n\n` +
+        `💰 Amount: \`${data.tokenAmount}\` tokens\n` +
+        `🎟️ Tickets Earned: \`${buyEvent.ticketCount}\`\n` +
+        `👛 Wallet: \`${shortWallet}\`\n` +
+        `🔗 Source: \`On-chain\`\n\n` +
+        `🏆 Prize Pool: \`${raffle.prizeAmount} ${raffle.prizeType}\`\n` +
+        `⏰ Raffle Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC\n\n` +
         `_Every 1 token purchased = 100 raffle tickets!_`;
 
       if (raffle.mediaUrl && raffle.mediaType) {
