@@ -8,7 +8,8 @@ const CETUS_PACKAGE_ID = '0x1eabed72c53feb3805120a081dc15963c204dc8d091542592aba
 export class CetusIntegration implements DexIntegration {
   name = 'cetus';
   private monitoring = false;
-  private unsubscribe: (() => void) | null = null;
+  private pollInterval: NodeJS.Timeout | null = null;
+  private lastProcessedTimestamp: number = Date.now();
 
   async monitor(tokenAddress: string, callback: (buyEvent: BuyEventData) => Promise<void>): Promise<void> {
     if (this.monitoring) {
@@ -19,41 +20,77 @@ export class CetusIntegration implements DexIntegration {
     this.monitoring = true;
     const client = getSuiClient();
 
-    logger.info(`Starting Cetus monitoring for token: ${tokenAddress}`);
+    logger.info(`🔄 Starting Cetus POLLING for token: ${tokenAddress}`);
+    logger.info(`📡 Polling every 10 seconds for recent transactions`);
 
+    // Start polling for events instead of WebSocket subscription
+    this.pollInterval = setInterval(async () => {
+      try {
+        await this.pollForSwapEvents(client, tokenAddress, callback);
+      } catch (error) {
+        logger.error('❌ Error polling Cetus events:', error);
+      }
+    }, 10000); // Poll every 10 seconds
+
+    // Do an immediate poll on start
     try {
-      // Subscribe to Cetus swap events
-      const unsubscribe = await client.subscribeEvent({
-        filter: {
-          Package: CETUS_PACKAGE_ID,
-        },
-        onMessage: async (event) => {
-          try {
-            const buyEvent = await this.parseSwapEvent(event, tokenAddress);
-            if (buyEvent) {
-              await callback(buyEvent);
-            }
-          } catch (error) {
-            logger.error('Error processing Cetus event:', error);
-          }
-        },
-      });
-
-      this.unsubscribe = unsubscribe;
+      await this.pollForSwapEvents(client, tokenAddress, callback);
     } catch (error) {
-      logger.error('Error starting Cetus monitoring:', error);
-      this.monitoring = false;
-      throw error;
+      logger.error('❌ Error in initial Cetus poll:', error);
     }
   }
 
   async stop(): Promise<void> {
-    if (this.unsubscribe) {
-      this.unsubscribe();
-      this.unsubscribe = null;
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
     }
     this.monitoring = false;
     logger.info('Cetus monitoring stopped');
+  }
+
+  private async pollForSwapEvents(
+    client: any,
+    tokenAddress: string,
+    callback: (buyEvent: BuyEventData) => Promise<void>
+  ): Promise<void> {
+    try {
+      // Query recent events from Cetus package
+      const events = await client.queryEvents({
+        query: {
+          MoveEventType: `${CETUS_PACKAGE_ID}::pool::SwapEvent`,
+        },
+        limit: 50,
+        order: 'descending',
+      });
+
+      logger.debug(`📥 Fetched ${events.data?.length || 0} recent Cetus swap events`);
+
+      if (!events.data || events.data.length === 0) {
+        return;
+      }
+
+      // Process events in reverse order (oldest first)
+      const eventsToProcess = events.data.reverse();
+
+      for (const event of eventsToProcess) {
+        // Skip events we've already processed
+        const eventTimestamp = parseInt(event.timestampMs || '0');
+        if (eventTimestamp <= this.lastProcessedTimestamp) {
+          continue;
+        }
+
+        const buyEvent = await this.parseSwapEvent(event, tokenAddress);
+        if (buyEvent) {
+          await callback(buyEvent);
+        }
+
+        // Update last processed timestamp
+        this.lastProcessedTimestamp = eventTimestamp;
+      }
+    } catch (error) {
+      logger.error('❌ Error querying Cetus events:', error);
+    }
   }
 
   private async parseSwapEvent(event: any, targetTokenAddress: string): Promise<BuyEventData | null> {
