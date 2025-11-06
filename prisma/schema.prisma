@@ -18,6 +18,7 @@ model Raffle {
   endTime     DateTime
   prizeType   String   // USDC, AQUA, or SUI
   prizeAmount String   // Amount as string to handle decimals
+  minimumPurchase String? // Minimum token purchase to earn tickets
   mediaUrl    String?  // Telegram file ID or URL
   mediaType   String?  // image, video, gif
   status      String   @default("active") // active, ended, winner_selected

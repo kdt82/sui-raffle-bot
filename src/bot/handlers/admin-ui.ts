@@ -590,9 +590,14 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         endTime: new Date(data.endTime),
         prizeType: data.prizeType,
         prizeAmount: data.prizeAmount,
+        minimumPurchase: data.minimumPurchase || null,
         status: RAFFLE_STATUS.ACTIVE,
       },
     });
+
+    const minimumText = raffle.minimumPurchase 
+      ? `\nMinimum Purchase: ${raffle.minimumPurchase} tokens` 
+      : '';
 
     await bot.sendMessage(
       chatId,
@@ -601,7 +606,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       `Contract Address: \`${raffle.ca}\`\n` +
       `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
       `Ends: ${raffle.endTime.toLocaleString()}\n` +
-      `Prize: ${raffle.prizeAmount} ${raffle.prizeType}`,
+      `Prize: ${raffle.prizeAmount} ${raffle.prizeType}${minimumText}`,
       { parse_mode: 'Markdown' }
     );
   } catch (error) {
