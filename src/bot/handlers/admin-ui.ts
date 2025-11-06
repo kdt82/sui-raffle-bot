@@ -39,7 +39,7 @@ export async function handleCreateRaffleUI(msg: TelegramBot.Message): Promise<vo
   await bot.sendMessage(
     chatId,
     `🎰 **Create New Raffle**\n\n` +
-    `Step 1/5: Contract Address\n\n` +
+    `Step 1/6: Contract Address\n\n` +
     `Please send the contract address (CA) of the token to monitor.\n\n` +
     `Example: \`0x1234567890abcdef...\``,
     {
@@ -148,6 +148,9 @@ export async function handleCreateRaffleStep(
     case 'create_raffle_contract':
       await handleContractAddressStep(msg, data);
       break;
+    case 'create_raffle_start_time':
+      await handleStartTimeStep(msg, data);
+      break;
     case 'create_raffle_end_time':
       await handleEndTimeStep(msg, data);
       break;
@@ -179,12 +182,13 @@ async function handleContractAddressStep(msg: TelegramBot.Message, data: Record<
   data.contractAddress = contractAddress;
   data.dex = DEFAULT_DEX;
   conversationManager.updateConversation(userId, chatId, {
-    step: 'create_raffle_end_time',
+    step: 'create_raffle_start_time',
     data,
   });
 
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
+      [{ text: '▶️ Start Now', callback_data: 'start_now' }],
       [{ text: '🔙 Back', callback_data: 'back_to_contract' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
   };
@@ -192,7 +196,82 @@ async function handleContractAddressStep(msg: TelegramBot.Message, data: Record<
   await bot.sendMessage(
     chatId,
     `✅ Contract Address: \`${contractAddress}\`\n\n` +
-    `Step 2/5: End Time\n\n` +
+    `Step 2/6: Start Time\n\n` +
+    `Please send the raffle start time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
+    `Example: 10/11/2024 12:00:00\n\n` +
+    `Or click "Start Now" to start the raffle immediately.`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard,
+    }
+  );
+}
+
+async function handleStartTimeStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
+  const startTimeStr = msg.text?.trim();
+
+  logger.info(`Received start date input: "${startTimeStr}"`);
+
+  if (!startTimeStr) {
+    await bot.sendMessage(chatId, '❌ Please send a valid start time or click "Start Now".');
+    return;
+  }
+
+  // Parse DD/MM/YYYY HH:mm:ss format
+  const dateTimeRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/;
+  const match = startTimeStr.match(dateTimeRegex);
+  
+  logger.info(`Start time regex match result: ${match ? 'SUCCESS' : 'FAILED'}`);
+  
+  if (!match) {
+    await bot.sendMessage(
+      chatId,
+      `❌ Invalid format. Please use: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
+      `Example: 10/11/2024 12:00:00\n\n` +
+      `You sent: "${startTimeStr}"\n\n` +
+      `Or click "Start Now" to start immediately.`
+    );
+    return;
+  }
+
+  const [, day, month, year, hours, minutes, seconds] = match;
+  logger.info(`Parsed start time values - Day: ${day}, Month: ${month}, Year: ${year}, Time: ${hours}:${minutes}:${seconds}`);
+  
+  const startTime = new Date(Date.UTC(
+    parseInt(year),
+    parseInt(month) - 1,
+    parseInt(day),
+    parseInt(hours),
+    parseInt(minutes),
+    parseInt(seconds)
+  ));
+
+  logger.info(`Parsed start date: ${startTime.toISOString()}, Valid: ${!isNaN(startTime.getTime())}`);
+
+  if (isNaN(startTime.getTime())) {
+    await bot.sendMessage(chatId, '❌ Invalid date. Please check your input.');
+    return;
+  }
+
+  // Start time can be in past or future (for scheduling)
+  data.startTime = startTime.toISOString();
+  conversationManager.updateConversation(userId, chatId, {
+    step: 'create_raffle_end_time',
+    data,
+  });
+
+  const keyboard: TelegramBot.InlineKeyboardMarkup = {
+    inline_keyboard: [
+      [{ text: '🔙 Back', callback_data: 'back_to_start_time' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+    ],
+  };
+
+  await bot.sendMessage(
+    chatId,
+    `✅ Start Time: ${startTime.toLocaleString()} UTC\n\n` +
+    `Step 3/6: End Time\n\n` +
     `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
     `Example: 31/12/2024 23:59:59`,
     {
@@ -249,6 +328,18 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
     return;
   }
 
+  // Validate end time is after start time
+  const startTime = data.startTime ? new Date(data.startTime) : new Date();
+  if (endTime <= startTime) {
+    await bot.sendMessage(
+      chatId, 
+      `❌ End time must be after start time.\n\n` +
+      `Start time: ${startTime.toLocaleString()} UTC\n` +
+      `Your end time: ${endTime.toLocaleString()} UTC`
+    );
+    return;
+  }
+
   if (endTime <= new Date()) {
     await bot.sendMessage(chatId, `❌ End time must be in the future.\n\nCurrent time: ${new Date().toISOString()}\nYour time: ${endTime.toISOString()}`);
     return;
@@ -276,7 +367,7 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
   await bot.sendMessage(
     chatId,
     `✅ End Time: ${endTime.toLocaleString()}\n\n` +
-    `Step 3/5: Prize Type\n\n` +
+    `Step 4/6: Prize Type\n\n` +
     `Select the prize type:`,
     {
       reply_markup: keyboard,
@@ -314,7 +405,7 @@ async function handlePrizeAmountStep(msg: TelegramBot.Message, data: Record<stri
   await bot.sendMessage(
     chatId,
     `✅ Prize Amount: ${prizeAmount}\n\n` +
-    `Step 5/5: Minimum Purchase (Optional)\n\n` +
+    `Step 6/6: Minimum Purchase (Optional)\n\n` +
     `Set a minimum token purchase amount to earn tickets.\n` +
     `Purchases below this amount will not earn tickets.\n\n` +
     `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -413,7 +504,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id, { text: `Selected ${prizeType}` });
       await bot.editMessageText(
         `✅ Prize Type: ${prizeType}\n\n` +
-        `Step 4/5: Prize Amount\n\n` +
+        `Step 5/6: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
@@ -421,6 +512,32 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
           reply_markup: {
             inline_keyboard: [
               [{ text: '🔙 Back', callback_data: 'back_to_prize_type' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'start_now') {
+      conversation.data.startTime = new Date().toISOString();
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_end_time',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: 'Starting now' });
+      await bot.editMessageText(
+        `✅ Start Time: Now (${new Date().toLocaleString()} UTC)\n\n` +
+        `Step 3/6: End Time\n\n` +
+        `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
+        `Example: 31/12/2024 23:59:59`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔙 Back', callback_data: 'back_to_start_time' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
             ],
           },
         }
@@ -454,7 +571,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       });
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
-        `Step 1/4: Contract Address\n\n` +
+        `Step 1/6: Contract Address\n\n` +
         `Please send the contract address (CA) of the token to monitor.\n\n` +
         `Example: \`0x1234567890abcdef...\``,
         {
@@ -471,15 +588,45 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       return;
     }
 
+    if (callbackData === 'back_to_start_time') {
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_start_time',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id);
+      await bot.editMessageText(
+        `✅ Contract Address: \`${conversation.data.contractAddress}\`\n\n` +
+        `Step 2/6: Start Time\n\n` +
+        `Please send the raffle start time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
+        `Example: 10/11/2024 12:00:00\n\n` +
+        `Or click "Start Now" to start the raffle immediately.`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '▶️ Start Now', callback_data: 'start_now' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_contract' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
     if (callbackData === 'back_to_end_time') {
       conversationManager.updateConversation(userId, chatId, {
         step: 'create_raffle_end_time',
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
+      const startTimeDisplay = conversation.data.startTime 
+        ? new Date(conversation.data.startTime).toLocaleString() + ' UTC'
+        : 'Now';
       await bot.editMessageText(
-        `? Contract Address: \`${conversation.data.contractAddress}\`\n\n` +
-        `Step 2/4: End Time\n\n` +
+        `✅ Start Time: ${startTimeDisplay}\n\n` +
+        `Step 3/6: End Time\n\n` +
         `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
         `Example: 31/12/2024 23:59:59`,
         {
@@ -488,7 +635,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
-              [{ text: '?? Back', callback_data: 'back_to_contract' }, { text: '? Cancel', callback_data: 'cancel_create_raffle' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_start_time' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
             ],
           },
         }
@@ -508,7 +655,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       }));
       await bot.editMessageText(
         `✅ End Time: ${new Date(conversation.data.endTime).toLocaleString()}\n\n` +
-        `Step 3/4: Prize Type\n\n` +
+        `Step 4/6: Prize Type\n\n` +
         `Select the prize type:`,
         {
           chat_id: chatId,
@@ -532,7 +679,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
         `✅ Prize Type: ${conversation.data.prizeType}\n\n` +
-        `Step 4/5: Prize Amount\n\n` +
+        `Step 5/6: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
@@ -555,7 +702,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
         `✅ Prize Amount: ${conversation.data.prizeAmount}\n\n` +
-        `Step 5/5: Minimum Purchase (Optional)\n\n` +
+        `Step 6/6: Minimum Purchase (Optional)\n\n` +
         `Set a minimum token purchase amount to earn tickets.\n` +
         `Purchases below this amount will not earn tickets.\n\n` +
         `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -586,7 +733,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       data: {
         ca: data.contractAddress,
         dex: DEFAULT_DEX,
-        startTime: new Date(),
+        startTime: data.startTime ? new Date(data.startTime) : new Date(),
         endTime: new Date(data.endTime),
         prizeType: data.prizeType,
         prizeAmount: data.prizeAmount,
@@ -605,7 +752,8 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       `Raffle ID: ${raffle.id}\n` +
       `Contract Address: \`${raffle.ca}\`\n` +
       `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
-      `Ends: ${raffle.endTime.toLocaleString()}\n` +
+      `Start: ${raffle.startTime.toLocaleString()} UTC\n` +
+      `Ends: ${raffle.endTime.toLocaleString()} UTC\n` +
       `Prize: ${raffle.prizeAmount} ${raffle.prizeType}${minimumText}`,
       { parse_mode: 'Markdown' }
     );
