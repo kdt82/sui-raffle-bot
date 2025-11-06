@@ -38,8 +38,8 @@ export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void
       chatId,
       `✅ Raffle Cancelled Successfully!\n\n` +
       `Raffle ID: ${activeRaffle.id}\n` +
-      `Contract: ${activeRaffle.contractAddress.slice(0, 10)}...${activeRaffle.contractAddress.slice(-6)}\n` +
-      `DEX: ${activeRaffle.dexType.toUpperCase()}\n` +
+      `Contract: ${activeRaffle.ca.slice(0, 10)}...${activeRaffle.ca.slice(-6)}\n` +
+      `DEX: ${activeRaffle.dex.toUpperCase()}\n` +
       `Prize: ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}\n\n` +
       `The raffle has been cancelled and buy detection has stopped.`
     );
