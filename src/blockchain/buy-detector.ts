@@ -7,6 +7,7 @@ import { getRedisClient } from '../utils/redis';
 import { dexFactory } from './dex/factory';
 import { DexType } from '../utils/constants';
 import { BuyEventData } from './dex/base';
+import { bot } from '../bot';
 
 export const BUY_EVENTS_QUEUE = 'buy-events';
 
@@ -147,6 +148,9 @@ export class BuyDetector {
 
       logger.info(`Buy event queued: ${buyEvent.id}, ${buyEvent.ticketCount} tickets`);
 
+      // Send broadcast notification to channel
+      await this.broadcastBuyNotification(buyEvent, data);
+
       // Auto-link wallet if not already linked
       await this.autoLinkWallet(data.walletAddress);
     } catch (error) {
@@ -167,6 +171,66 @@ export class BuyDetector {
       }
     } catch (error) {
       logger.error('Error auto-linking wallet:', error);
+    }
+  }
+
+  private async broadcastBuyNotification(buyEvent: any, data: BuyEventData): Promise<void> {
+    try {
+      const broadcastChannelId = process.env.BROADCAST_CHANNEL_ID;
+      if (!broadcastChannelId) {
+        logger.debug('No BROADCAST_CHANNEL_ID configured, skipping broadcast');
+        return;
+      }
+
+      // Get raffle details
+      const raffle = await prisma.raffle.findUnique({
+        where: { id: buyEvent.raffleId },
+      });
+
+      if (!raffle) return;
+
+      // Format wallet address
+      const shortWallet = `${data.walletAddress.slice(0, 6)}...${data.walletAddress.slice(-4)}`;
+
+      // Build message
+      const message = 
+        `🎉 *NEW BUY DETECTED!* 🎉\n\n` +
+        `💰 Amount: \`${data.tokenAmount}\` tokens\n` +
+        `🎟️ Tickets Earned: \`${buyEvent.ticketCount}\`\n` +
+        `👤 Wallet: \`${shortWallet}\`\n` +
+        `🔗 DEX: \`${raffle.dex.toUpperCase()}\`\n\n` +
+        `🏆 Prize Pool: \`${raffle.prizeAmount} ${raffle.prizeType}\`\n` +
+        `⏰ Raffle Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC\n\n` +
+        `_Every 1 token purchased = 100 raffle tickets!_`;
+
+      // Send message with media if available
+      if (raffle.mediaUrl && raffle.mediaType) {
+        if (raffle.mediaType === 'image') {
+          await bot.sendPhoto(broadcastChannelId, raffle.mediaUrl, {
+            caption: message,
+            parse_mode: 'Markdown',
+          });
+        } else if (raffle.mediaType === 'video') {
+          await bot.sendVideo(broadcastChannelId, raffle.mediaUrl, {
+            caption: message,
+            parse_mode: 'Markdown',
+          });
+        } else if (raffle.mediaType === 'gif') {
+          await bot.sendAnimation(broadcastChannelId, raffle.mediaUrl, {
+            caption: message,
+            parse_mode: 'Markdown',
+          });
+        }
+      } else {
+        // No media, just send text
+        await bot.sendMessage(broadcastChannelId, message, {
+          parse_mode: 'Markdown',
+        });
+      }
+
+      logger.info(`📢 Broadcast buy notification sent to channel ${broadcastChannelId}`);
+    } catch (error) {
+      logger.error('Error broadcasting buy notification:', error);
     }
   }
 }

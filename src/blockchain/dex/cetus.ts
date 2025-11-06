@@ -55,10 +55,14 @@ export class CetusIntegration implements DexIntegration {
     callback: (buyEvent: BuyEventData) => Promise<void>
   ): Promise<void> {
     try {
-      // Query recent events from Cetus package (use Package filter, not MoveEventType)
+      // Query recent SwapEvent from Cetus pool module
+      // Use MoveEventModule filter which is more flexible than full type
       const events = await client.queryEvents({
         query: {
-          Package: CETUS_PACKAGE_ID,
+          MoveEventModule: {
+            package: CETUS_PACKAGE_ID,
+            module: 'pool',
+          },
         },
         limit: 50,
         order: 'descending',
