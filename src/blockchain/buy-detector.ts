@@ -1102,6 +1102,12 @@ export class BuyDetector {
             caption: message,
             parse_mode: 'Markdown',
           });
+        } else if (mediaType === 'document') {
+          // For files sent as documents (uncompressed)
+          await bot.sendDocument(broadcastChannelId, mediaUrl, {
+            caption: message,
+            parse_mode: 'Markdown',
+          });
         }
       } else {
         await bot.sendMessage(broadcastChannelId, message, {
