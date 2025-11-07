@@ -79,6 +79,9 @@ export function registerAdminHandlers(): void {
       if (callbackData.startsWith('select_prize_type_') ||
           callbackData === 'confirm_create_raffle' ||
           callbackData === 'cancel_create_raffle' ||
+          callbackData === 'start_now' ||
+          callbackData === 'ratio_default' ||
+          callbackData === 'skip_minimum_purchase' ||
           callbackData.startsWith('back_to_')) {
         await withCallbackRateLimit(query, 'callback_ui', async () => {
           await requireAdminPrivateCallback(query, async () => {
