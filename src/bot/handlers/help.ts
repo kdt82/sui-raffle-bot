@@ -110,7 +110,7 @@ export async function handleWalletListCommand(msg: TelegramBot.Message): Promise
       }
 
       // Build detailed message
-      let message = `📋 *Linked Wallets Summary*\n`;
+      let message = `📋 Linked Wallets Summary\n`;
       message += `Total: ${walletUsers.length}\n\n`;
 
       // Send in chunks to avoid message length limits
@@ -120,7 +120,7 @@ export async function handleWalletListCommand(msg: TelegramBot.Message): Promise
         let chunkMessage = i === 0 ? message : '';
 
         if (i > 0) {
-          chunkMessage += `\n*Page ${Math.floor(i / chunkSize) + 1}*\n\n`;
+          chunkMessage += `\nPage ${Math.floor(i / chunkSize) + 1}\n\n`;
         }
 
         for (const wu of chunk) {
@@ -137,13 +137,13 @@ export async function handleWalletListCommand(msg: TelegramBot.Message): Promise
           });
 
           chunkMessage += `${num}. ${username}\n`;
-          chunkMessage += `   Wallet: \`${wu.walletAddress}\`\n`;
-          chunkMessage += `   Short: \`${shortWallet}\`\n`;
+          chunkMessage += `   Wallet: ${wu.walletAddress}\n`;
+          chunkMessage += `   Short: ${shortWallet}\n`;
           chunkMessage += `   Linked: ${linkedDate} UTC\n`;
           chunkMessage += `   Verified: ${wu.verified ? '✅' : '❌'}\n\n`;
         }
 
-        await bot.sendMessage(chatId, chunkMessage, { parse_mode: 'Markdown' });
+        await bot.sendMessage(chatId, chunkMessage);
 
         // Small delay between chunks to avoid rate limits
         if (i + chunkSize < walletUsers.length) {
@@ -153,13 +153,13 @@ export async function handleWalletListCommand(msg: TelegramBot.Message): Promise
 
       // Send summary with CSV option
       const summaryMessage =
-        `\n📊 *Summary Statistics*\n` +
+        `\n📊 Summary Statistics\n` +
         `Total Wallets: ${walletUsers.length}\n` +
         `Verified: ${walletUsers.filter(w => w.verified).length}\n` +
         `Unverified: ${walletUsers.filter(w => !w.verified).length}\n\n` +
         `💡 Tip: Use this list for manual crediting or verification`;
 
-      await bot.sendMessage(chatId, summaryMessage, { parse_mode: 'Markdown' });
+      await bot.sendMessage(chatId, summaryMessage);
 
       // Optionally create a CSV export for easy import
       const csv = generateWalletCSV(walletUsers);
