@@ -607,6 +607,24 @@ async function handleAnnouncementMediaStep(msg: TelegramBot.Message, data: Recor
     mediaFileId = msg.animation.file_id;
     mediaType = MEDIA_TYPES.GIF;
   }
+  // Check for document (images sent as files)
+  else if (msg.document) {
+    const mimeType = msg.document.mime_type;
+    if (mimeType?.startsWith('image/')) {
+      mediaFileId = msg.document.file_id;
+      mediaType = MEDIA_TYPES.IMAGE;
+    } else if (mimeType?.startsWith('video/')) {
+      mediaFileId = msg.document.file_id;
+      mediaType = MEDIA_TYPES.VIDEO;
+    } else {
+      await bot.sendMessage(
+        chatId,
+        '❌ Please send a valid image, video, or GIF.\n\n' +
+        'Or click "Skip" to continue without announcement media.'
+      );
+      return;
+    }
+  }
   else {
     await bot.sendMessage(
       chatId,
@@ -667,6 +685,24 @@ async function handleNotificationMediaStep(msg: TelegramBot.Message, data: Recor
     mediaFileId = msg.animation.file_id;
     mediaType = MEDIA_TYPES.GIF;
   }
+  // Check for document (images sent as files)
+  else if (msg.document) {
+    const mimeType = msg.document.mime_type;
+    if (mimeType?.startsWith('image/')) {
+      mediaFileId = msg.document.file_id;
+      mediaType = MEDIA_TYPES.IMAGE;
+    } else if (mimeType?.startsWith('video/')) {
+      mediaFileId = msg.document.file_id;
+      mediaType = MEDIA_TYPES.VIDEO;
+    } else {
+      await bot.sendMessage(
+        chatId,
+        '❌ Please send a valid image, video, or GIF.\n\n' +
+        'Or click "Skip" to continue without notification media.'
+      );
+      return;
+    }
+  }
   else {
     await bot.sendMessage(
       chatId,
@@ -726,6 +762,24 @@ async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record
   else if (msg.animation) {
     mediaFileId = msg.animation.file_id;
     mediaType = MEDIA_TYPES.GIF;
+  }
+  // Check for document (images sent as files)
+  else if (msg.document) {
+    const mimeType = msg.document.mime_type;
+    if (mimeType?.startsWith('image/')) {
+      mediaFileId = msg.document.file_id;
+      mediaType = MEDIA_TYPES.IMAGE;
+    } else if (mimeType?.startsWith('video/')) {
+      mediaFileId = msg.document.file_id;
+      mediaType = MEDIA_TYPES.VIDEO;
+    } else {
+      await bot.sendMessage(
+        chatId,
+        '❌ Please send a valid image, video, or GIF.\n\n' +
+        'Or click "Skip" to continue without leaderboard media.'
+      );
+      return;
+    }
   }
   else {
     await bot.sendMessage(
