@@ -4,6 +4,7 @@ import { prisma } from '../../utils/database';
 import { logger } from '../../utils/logger';
 import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX, getDexDisplayName, DexType, MAIN_CHAT_ID } from '../../utils/constants';
 import { conversationManager } from '../conversation';
+import { auditService } from '../../services/audit-service';
 
 // Helper function to extract token symbol from contract address
 // Example: 0xab954d078dab0a6727ce58388931850be4bdb6f72703ea3cad3d6eb0c12a0283::aqua::AQUA -> AQUA
@@ -27,6 +28,7 @@ function extractTokenSymbolFromCA(ca: string): string {
 export async function handleCreateRaffleUI(msg: TelegramBot.Message): Promise<void> {
   const chatId = msg.chat.id;
   const userId = BigInt(msg.from!.id);
+  const username = msg.from?.username;
 
   // Check if there's already an active raffle
   const activeRaffle = await prisma.raffle.findFirst({
@@ -46,7 +48,10 @@ export async function handleCreateRaffleUI(msg: TelegramBot.Message): Promise<vo
   }
 
   // Start conversation
-  conversationManager.createConversation(userId, chatId, 'create_raffle_contract');
+  const conv = conversationManager.createConversation(userId, chatId, 'create_raffle_contract');
+  // Add admin info to conversation data
+  conv.data.adminId = userId.toString();
+  conv.data.adminUsername = username;
 
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
@@ -1547,6 +1552,10 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
 
 async function createRaffleFromData(chatId: number, data: Record<string, any>): Promise<void> {
   try {
+    // Extract admin info from conversation data
+    const adminId = data.adminId ? BigInt(data.adminId) : undefined;
+    const adminUsername = data.adminUsername;
+
     const startTime = data.startTime ? new Date(data.startTime) : new Date();
     const isStartingNow = startTime <= new Date();
 
@@ -1572,6 +1581,13 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         started: isStartingNow, // Mark as started if starting immediately
       },
     });
+
+    // AUDIT LOG: Raffle created (non-blocking)
+    if (adminId) {
+      auditService.logRaffleCreated(adminId, adminUsername, raffle).catch(err =>
+        logger.error('Audit log failed (non-blocking):', err)
+      );
+    }
 
     // Format ticket ratio for display
     const ratio = parseFloat(raffle.ticketsPerToken || '100');

@@ -7,6 +7,7 @@ import { trackRaffleEvent } from '../utils/metrics';
 import { scheduleRaffleAnalytics } from '../workers/analytics-worker';
 import { scheduleRaffleBackup } from '../workers/backup-worker';
 import { bot } from '../bot';
+import { auditService } from './audit-service';
 
 const MAIN_CHAT_ID = process.env.MAIN_CHAT_ID;
 
@@ -123,6 +124,11 @@ async function sendRaffleStartAnnouncement(raffle: any): Promise<void> {
 
     logger.info(`Start announcement sent for raffle: ${raffle.id}`);
 
+    // AUDIT LOG: Raffle started (non-blocking)
+    auditService.logRaffleStarted(raffle.id).catch(err =>
+      logger.error('Audit log failed (non-blocking):', err)
+    );
+
     // Track metrics
     trackRaffleEvent('started');
 
@@ -175,6 +181,11 @@ async function endRaffle(raffleId: string): Promise<void> {
       where: { id: raffleId },
       data: { status: RAFFLE_STATUS.ENDED },
     });
+
+    // AUDIT LOG: Raffle ended (non-blocking)
+    auditService.logRaffleEnded(raffleId, raffle).catch(err =>
+      logger.error('Audit log failed (non-blocking):', err)
+    );
 
     // Track metrics
     trackRaffleEvent('ended');

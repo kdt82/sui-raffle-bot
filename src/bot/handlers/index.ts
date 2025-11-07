@@ -6,6 +6,7 @@ import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
 import { handleBackupCommand, handleBackupListCommand, handleBackupDownloadCommand, handleBackupRestoreCommand, handleBackupRaffleCommand, handleBackupCleanupCommand } from './backup';
+import { handleAuditLogsCommand, handleAuditLogsRaffleCommand, handleAuditFailuresCommand } from './audit';
 import { requireAdmin, requireAdminCallback, requireAdminPrivate, requireAdminPrivateCallback } from '../middleware';
 import { conversationManager } from '../conversation';
 import { withCallbackRateLimit } from '../rate-limit-middleware';
@@ -353,6 +354,37 @@ export function registerAdminHandlers(): void {
         await handleRemoveTickets(msg);
       } catch (error) {
         logger.error('Error handling /remove_tickets command:', error);
+      }
+    });
+  });
+
+  // Audit log commands
+  bot.onText(/\/auditlogs$/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleAuditLogsCommand(msg);
+      } catch (error) {
+        logger.error('Error handling /auditlogs command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/auditlogs_raffle/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleAuditLogsRaffleCommand(msg);
+      } catch (error) {
+        logger.error('Error handling /auditlogs_raffle command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/auditfailures/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleAuditFailuresCommand(msg);
+      } catch (error) {
+        logger.error('Error handling /auditfailures command:', error);
       }
     });
   });

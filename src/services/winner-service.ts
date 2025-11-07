@@ -6,6 +6,7 @@ import { trackRaffleEvent } from '../utils/metrics';
 import { getSuiClient } from '../blockchain/sui-client';
 import { bot } from '../bot';
 import { suiRandomnessService, clientSideWeightedRandom } from '../blockchain/sui-randomness';
+import { auditService } from './audit-service';
 
 export async function selectWinner(raffleId: string): Promise<void> {
   try {
@@ -50,6 +51,11 @@ export async function selectWinner(raffleId: string): Promise<void> {
     });
 
     logger.info(`Winner selected: ${winner.walletAddress} with ${winner.ticketCount} tickets (Method: ${winner.selectionMethod})`);
+
+    // AUDIT LOG: Winner selected (non-blocking)
+    auditService.logWinnerSelected(raffleId, winner, totalTickets, tickets.length).catch(err =>
+      logger.error('Audit log failed (non-blocking):', err)
+    );
 
     // Track metrics
     trackRaffleEvent('winner_selected');

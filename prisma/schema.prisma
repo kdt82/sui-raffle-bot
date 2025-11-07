@@ -211,3 +211,26 @@ model UserActivity {
   @@index([timestamp])
 }
 
+model AuditLog {
+  id             String   @id @default(cuid())
+  action         String   // raffle_created, raffle_ended, winner_selected, tickets_added, etc.
+  performedBy    BigInt?  // Telegram user ID (null for system actions)
+  performedByUsername String? // Telegram username for reference
+  targetEntity   String?  // raffleId, walletAddress, etc.
+  entityType     String?  // raffle, ticket, wallet, admin, etc.
+  oldValue       String?  // JSON of previous state
+  newValue       String?  // JSON of new state
+  metadata       String?  // Additional context as JSON
+  success        Boolean  @default(true) // Whether action succeeded
+  errorMessage   String?  // Error details if failed
+  ipAddress      String?  // For future web interface
+  timestamp      DateTime @default(now())
+
+  @@index([action])
+  @@index([performedBy])
+  @@index([timestamp])
+  @@index([targetEntity])
+  @@index([entityType])
+  @@index([success])
+}
+

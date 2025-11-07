@@ -7,6 +7,7 @@ import { withRateLimit } from '../rate-limit-middleware';
 import { RATE_LIMITS } from '../../utils/rate-limiter';
 import { incrementCommand } from '../../utils/metrics';
 import { analyticsService } from '../../services/analytics-service';
+import { auditService } from '../../services/audit-service';
 
 export async function handleStartCommand(msg: TelegramBot.Message): Promise<void> {
   return withRateLimit(msg, 'start', RATE_LIMITS.USER_COMMAND, async () => {
@@ -222,6 +223,12 @@ export async function handleLinkWalletCommand(msg: TelegramBot.Message): Promise
   }
 
   try {
+    // Check if wallet already exists (to determine if new or relink)
+    const existing = await prisma.walletUser.findUnique({
+      where: { walletAddress },
+    });
+    const isNew = !existing;
+
     // Upsert wallet user
     await prisma.walletUser.upsert({
       where: { walletAddress },
@@ -237,6 +244,11 @@ export async function handleLinkWalletCommand(msg: TelegramBot.Message): Promise
         verified: false,
       },
     });
+
+    // AUDIT LOG: Wallet linked (non-blocking)
+    auditService.logWalletLinked(userId, username || undefined, walletAddress, isNew).catch(err =>
+      logger.error('Audit log failed (non-blocking):', err)
+    );
 
     await bot.sendMessage(
       chatId,
@@ -325,11 +337,17 @@ export async function handleUnlinkWalletCommand(msg: TelegramBot.Message): Promi
 
       const walletAddress = walletUser.walletAddress;
       const shortWallet = `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}`;
+      const username = msg.from?.username || undefined;
 
       // Delete the wallet user link
       await prisma.walletUser.delete({
         where: { walletAddress },
       });
+
+      // AUDIT LOG: Wallet unlinked (non-blocking)
+      auditService.logWalletUnlinked(userId, username, walletAddress).catch(err =>
+        logger.error('Audit log failed (non-blocking):', err)
+      );
 
       await bot.sendMessage(
         chatId,
