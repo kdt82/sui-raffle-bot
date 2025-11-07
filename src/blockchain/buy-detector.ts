@@ -1071,6 +1071,11 @@ export class BuyDetector {
       // Calculate countdown
       const countdown = getCountdownText(raffle.endTime);
 
+      // Get the dynamic tickets per token ratio
+      const ticketsPerTokenRatio = raffle.ticketsPerToken 
+        ? parseFloat(raffle.ticketsPerToken) 
+        : 100;
+
       const message =
         `🎉 *NEW BUY DETECTED!* 🎉\n\n` +
         `💰 Amount: \`${data.tokenAmount}\` tokens\n` +
@@ -1080,7 +1085,7 @@ export class BuyDetector {
         `🏆 Prize Pool: \`${raffle.prizeAmount} ${raffle.prizeType}\`\n` +
         `${countdown}\n` +
         `📅 Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC${minimumText}\n\n` +
-        `_Every 1 token purchased = 100 raffle tickets!_`;
+        `_Every 1 token purchased = ${ticketsPerTokenRatio} raffle tickets!_`;
 
       // Use notification media if available, otherwise fall back to old media fields
       const mediaUrl = raffle.notificationMediaUrl || raffle.mediaUrl;
