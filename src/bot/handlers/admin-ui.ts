@@ -223,10 +223,23 @@ async function handleContractAddressStep(msg: TelegramBot.Message, data: Record<
     ],
   };
 
+  // Get current UTC time (to nearest minute)
+  const now = new Date();
+  const currentUtc = now.toLocaleString('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    hour12: false
+  });
+
   await bot.sendMessage(
     chatId,
     `✅ Contract Address: \`${contractAddress}\`\n\n` +
     `Step 2/6: Start Time\n\n` +
+    `🕐 Current UTC Time: \`${currentUtc}\`\n\n` +
     `Please send the raffle start time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
     `Example: 10/11/2024 12:00:00\n\n` +
     `Or click "Start Now" to start the raffle immediately.`,
@@ -298,6 +311,18 @@ async function handleStartTimeStep(msg: TelegramBot.Message, data: Record<string
     ],
   };
 
+  // Get current UTC time (to nearest minute)
+  const now = new Date();
+  const currentUtc = now.toLocaleString('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    hour12: false
+  });
+
   await bot.sendMessage(
     chatId,
     `✅ Start Time: ${startTime.toLocaleString('en-US', { 
@@ -312,6 +337,7 @@ async function handleStartTimeStep(msg: TelegramBot.Message, data: Record<string
       timeZoneName: 'short'
     })}\n\n` +
     `Step 3/7: End Time\n\n` +
+    `🕐 Current UTC Time: \`${currentUtc}\`\n\n` +
     `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
     `Example: 31/12/2024 23:59:59`,
     {
@@ -1031,9 +1057,23 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
+      
+      // Get current UTC time (to nearest minute)
+      const now = new Date();
+      const currentUtc = now.toLocaleString('en-US', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'UTC',
+        hour12: false
+      });
+      
       await bot.editMessageText(
         `✅ Contract Address: \`${conversation.data.contractAddress}\`\n\n` +
         `Step 2/6: Start Time\n\n` +
+        `🕐 Current UTC Time: \`${currentUtc}\`\n\n` +
         `Please send the raffle start time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
         `Example: 10/11/2024 12:00:00\n\n` +
         `Or click "Start Now" to start the raffle immediately.`,
@@ -1058,6 +1098,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
+      
       const startTimeDisplay = conversation.data.startTime 
         ? new Date(conversation.data.startTime).toLocaleString('en-US', {
             weekday: 'short',
@@ -1071,9 +1112,23 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
             timeZoneName: 'short'
           })
         : 'Now';
+      
+      // Get current UTC time (to nearest minute)
+      const now = new Date();
+      const currentUtc = now.toLocaleString('en-US', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'UTC',
+        hour12: false
+      });
+      
       await bot.editMessageText(
         `✅ Start Time: ${startTimeDisplay}\n\n` +
         `Step 3/7: End Time\n\n` +
+        `🕐 Current UTC Time: \`${currentUtc}\`\n\n` +
         `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
         `Example: 31/12/2024 23:59:59`,
         {
