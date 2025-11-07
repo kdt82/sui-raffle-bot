@@ -273,8 +273,18 @@ async function handleStartTimeStep(msg: TelegramBot.Message, data: Record<string
 
   await bot.sendMessage(
     chatId,
-    `✅ Start Time: ${startTime.toLocaleString()} UTC\n\n` +
-    `Step 3/6: End Time\n\n` +
+    `✅ Start Time: ${startTime.toLocaleString('en-US', { 
+      weekday: 'short', 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'UTC',
+      timeZoneName: 'short'
+    })}\n\n` +
+    `Step 3/7: End Time\n\n` +
     `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
     `Example: 31/12/2024 23:59:59`,
     {
@@ -369,8 +379,18 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
 
   await bot.sendMessage(
     chatId,
-    `✅ End Time: ${endTime.toLocaleString()}\n\n` +
-    `Step 4/6: Prize Type\n\n` +
+    `✅ End Time: ${endTime.toLocaleString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'UTC',
+      timeZoneName: 'short'
+    })}\n\n` +
+    `Step 4/7: Prize Type\n\n` +
     `Select the prize type:`,
     {
       reply_markup: keyboard,
@@ -569,7 +589,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id, { text: `Selected ${prizeType}` });
       await bot.editMessageText(
         `✅ Prize Type: ${prizeType}\n\n` +
-        `Step 5/6: Prize Amount\n\n` +
+        `Step 5/7: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
@@ -585,15 +605,30 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
     }
 
     if (callbackData === 'start_now') {
-      conversation.data.startTime = new Date().toISOString();
+      const now = new Date();
+      conversation.data.startTime = now.toISOString();
       conversationManager.updateConversation(userId, chatId, {
         step: 'create_raffle_end_time',
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id, { text: 'Starting now' });
+      
+      // Format UTC time for display
+      const formattedNow = now.toLocaleString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: 'UTC',
+        timeZoneName: 'short'
+      });
+      
       await bot.editMessageText(
-        `✅ Start Time: Now (${new Date().toLocaleString()} UTC)\n\n` +
-        `Step 3/6: End Time\n\n` +
+        `✅ Start Time: ${formattedNow}\n\n` +
+        `Step 3/7: End Time\n\n` +
         `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
         `Example: 31/12/2024 23:59:59`,
         {
@@ -717,11 +752,21 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       });
       await bot.answerCallbackQuery(query.id);
       const startTimeDisplay = conversation.data.startTime 
-        ? new Date(conversation.data.startTime).toLocaleString() + ' UTC'
+        ? new Date(conversation.data.startTime).toLocaleString('en-US', {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZone: 'UTC',
+            timeZoneName: 'short'
+          })
         : 'Now';
       await bot.editMessageText(
         `✅ Start Time: ${startTimeDisplay}\n\n` +
-        `Step 3/6: End Time\n\n` +
+        `Step 3/7: End Time\n\n` +
         `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
         `Example: 31/12/2024 23:59:59`,
         {
@@ -749,8 +794,18 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         callback_data: `select_prize_type_${type}`,
       }));
       await bot.editMessageText(
-        `✅ End Time: ${new Date(conversation.data.endTime).toLocaleString()}\n\n` +
-        `Step 4/6: Prize Type\n\n` +
+        `✅ End Time: ${new Date(conversation.data.endTime).toLocaleString('en-US', {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          timeZone: 'UTC',
+          timeZoneName: 'short'
+        })}\n\n` +
+        `Step 4/7: Prize Type\n\n` +
         `Select the prize type:`,
         {
           chat_id: chatId,
@@ -774,7 +829,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
         `✅ Prize Type: ${conversation.data.prizeType}\n\n` +
-        `Step 5/6: Prize Amount\n\n` +
+        `Step 5/7: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
