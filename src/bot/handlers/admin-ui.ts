@@ -57,7 +57,7 @@ export async function handleCreateRaffleUI(msg: TelegramBot.Message): Promise<vo
   await bot.sendMessage(
     chatId,
     `🎰 **Create New Raffle**\n\n` +
-    `Step 1/6: Contract Address\n\n` +
+    `Step 1/11: Contract Address\n\n` +
     `Please send the contract address (CA) of the token to monitor.\n\n` +
     `Example: \`0x1234567890abcdef...\``,
     {
@@ -238,7 +238,7 @@ async function handleContractAddressStep(msg: TelegramBot.Message, data: Record<
   await bot.sendMessage(
     chatId,
     `✅ Contract Address: \`${contractAddress}\`\n\n` +
-    `Step 2/6: Start Time\n\n` +
+    `Step 2/11: Start Time\n\n` +
     `🕐 Current UTC Time: \`${currentUtc}\`\n\n` +
     `Please send the raffle start time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
     `Example: 10/11/2024 12:00:00\n\n` +
@@ -336,7 +336,7 @@ async function handleStartTimeStep(msg: TelegramBot.Message, data: Record<string
       timeZone: 'UTC',
       timeZoneName: 'short'
     })}\n\n` +
-    `Step 3/7: End Time\n\n` +
+    `Step 3/11: End Time\n\n` +
     `🕐 Current UTC Time: \`${currentUtc}\`\n\n` +
     `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
     `Example: 31/12/2024 23:59:59`,
@@ -447,7 +447,7 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
       timeZone: 'UTC',
       timeZoneName: 'short'
     })}\n\n` +
-    `Step 4/7: Prize Type\n\n` +
+    `Step 4/11: Prize Type\n\n` +
     `Select the prize type:`,
     {
       reply_markup: keyboard,
@@ -485,7 +485,7 @@ async function handlePrizeAmountStep(msg: TelegramBot.Message, data: Record<stri
   await bot.sendMessage(
     chatId,
     `✅ Prize Amount: ${prizeAmount}\n\n` +
-    `Step 6/7: Ticket Ratio\n\n` +
+    `Step 6/11: Ticket Ratio\n\n` +
     `Set how many tickets are earned per token purchased.\n\n` +
     `**Format Options:**\n` +
     `• Enter "100" = 100 tickets per token\n` +
@@ -838,7 +838,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id, { text: `Selected ${prizeType}` });
       await bot.editMessageText(
         `✅ Prize Type: ${prizeType}\n\n` +
-        `Step 5/7: Prize Amount\n\n` +
+        `Step 5/11: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
@@ -933,16 +933,16 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id, { text: 'Skipped minimum purchase' });
       await bot.editMessageText(
         `✅ Minimum Purchase: None\n\n` +
-        `Step 8/8: Media Upload (Optional)\n\n` +
+        `Step 8/11: Announcement Media (Optional)\n\n` +
         `📸 Send an image, video, or GIF for your raffle announcement.\n\n` +
         `This media will be shown when users view the raffle details.\n\n` +
-        `Or click "Skip Media" to continue without media.`,
+        `Or click "Skip" to continue without media.`,
         {
           chat_id: chatId,
           message_id: query.message!.message_id,
           reply_markup: {
             inline_keyboard: [
-              [{ text: '⏭️ Skip Media', callback_data: 'skip_media' }],
+              [{ text: '⏭️ Skip', callback_data: 'skip_announcement_media' }],
               [{ text: '🔙 Back', callback_data: 'back_to_minimum_purchase' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
             ],
           },
@@ -1034,7 +1034,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       });
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
-        `Step 1/6: Contract Address\n\n` +
+        `Step 1/11: Contract Address\n\n` +
         `Please send the contract address (CA) of the token to monitor.\n\n` +
         `Example: \`0x1234567890abcdef...\``,
         {
@@ -1072,7 +1072,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       
       await bot.editMessageText(
         `✅ Contract Address: \`${conversation.data.contractAddress}\`\n\n` +
-        `Step 2/6: Start Time\n\n` +
+        `Step 2/11: Start Time\n\n` +
         `🕐 Current UTC Time: \`${currentUtc}\`\n\n` +
         `Please send the raffle start time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
         `Example: 10/11/2024 12:00:00\n\n` +
@@ -1127,7 +1127,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       
       await bot.editMessageText(
         `✅ Start Time: ${startTimeDisplay}\n\n` +
-        `Step 3/7: End Time\n\n` +
+        `Step 3/11: End Time\n\n` +
         `🕐 Current UTC Time: \`${currentUtc}\`\n\n` +
         `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
         `Example: 31/12/2024 23:59:59`,
@@ -1172,7 +1172,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
           timeZone: 'UTC',
           timeZoneName: 'short'
         })}\n\n` +
-        `Step 4/7: Prize Type\n\n` +
+        `Step 4/11: Prize Type\n\n` +
         `Select the prize type:`,
         {
           chat_id: chatId,
@@ -1196,7 +1196,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
         `✅ Prize Type: ${conversation.data.prizeType}\n\n` +
-        `Step 5/7: Prize Amount\n\n` +
+        `Step 5/11: Prize Amount\n\n` +
         `Please send the prize amount:`,
         {
           chat_id: chatId,
@@ -1219,7 +1219,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id);
       await bot.editMessageText(
         `✅ Prize Amount: ${conversation.data.prizeAmount} ${conversation.data.prizeType}\n\n` +
-        `Step 6/7: Ticket Ratio\n\n` +
+        `Step 6/11: Ticket Ratio\n\n` +
         `Set how many tickets users get per token purchased.\n\n` +
         `💡 Two formats:\n` +
         `• Enter "100" for 100 tickets per token\n` +

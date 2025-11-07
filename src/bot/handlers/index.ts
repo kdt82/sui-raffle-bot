@@ -100,7 +100,8 @@ export function registerAdminHandlers(): void {
 
   // Handle text messages that might be part of a conversation
   bot.on('message', async (msg) => {
-    if (!msg.text || msg.text.startsWith('/')) return; // Skip commands
+    // Skip commands but allow media and regular text messages
+    if (msg.text && msg.text.startsWith('/')) return;
 
     try {
       const userId = BigInt(msg.from!.id);
