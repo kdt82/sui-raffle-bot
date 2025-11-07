@@ -1547,11 +1547,14 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
 
 async function createRaffleFromData(chatId: number, data: Record<string, any>): Promise<void> {
   try {
+    const startTime = data.startTime ? new Date(data.startTime) : new Date();
+    const isStartingNow = startTime <= new Date();
+
     const raffle = await prisma.raffle.create({
       data: {
         ca: data.contractAddress,
         dex: DEFAULT_DEX,
-        startTime: data.startTime ? new Date(data.startTime) : new Date(),
+        startTime: startTime,
         endTime: new Date(data.endTime),
         prizeType: data.prizeType,
         prizeAmount: data.prizeAmount,
@@ -1566,6 +1569,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         leaderboardMediaUrl: data.leaderboardMediaUrl || null,
         leaderboardMediaType: data.leaderboardMediaType || null,
         status: RAFFLE_STATUS.ACTIVE,
+        started: isStartingNow, // Mark as started if starting immediately
       },
     });
 

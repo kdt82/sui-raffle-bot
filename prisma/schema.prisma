@@ -29,6 +29,7 @@ model Raffle {
   leaderboardMediaUrl     String?  // Media for leaderboard display
   leaderboardMediaType    String?  // image, video, gif
   status      String   @default("active") // active, ended, winner_selected
+  started     Boolean  @default(false) // Whether start announcement has been sent
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -38,6 +39,7 @@ model Raffle {
 
   @@index([status])
   @@index([endTime])
+  @@index([startTime])
   @@index([dex])
 }
 

@@ -51,7 +51,7 @@ export async function recordError(type: string, component: string): Promise<void
 /**
  * Track raffle event
  */
-export async function trackRaffleEvent(event: 'created' | 'ended' | 'winner_selected'): Promise<void> {
+export async function trackRaffleEvent(event: 'created' | 'started' | 'ended' | 'winner_selected'): Promise<void> {
   try {
     const key = `metrics:raffle:${event}`;
     await redis.incr(key);
