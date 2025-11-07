@@ -170,6 +170,20 @@ export function registerAdminHandlers(): void {
   bot.onText(/\/upload_media/, async (msg) => {
     await requireAdminPrivate(msg, async () => {
       try {
+        const userId = BigInt(msg.from!.id);
+        const conversation = conversationManager.getConversation(userId, msg.chat.id);
+        
+        // Don't allow /upload_media during raffle creation
+        if (conversation && conversation.step.startsWith('create_raffle')) {
+          await bot.sendMessage(
+            msg.chat.id,
+            '⚠️ You are currently creating a raffle.\n\n' +
+            'Please complete or cancel the raffle creation process first.\n\n' +
+            'Use the buttons provided or send /cancel_raffle to cancel.'
+          );
+          return;
+        }
+        
         await handleUploadMedia(msg);
       } catch (error) {
         logger.error('Error handling /upload_media command:', error);
@@ -326,36 +340,4 @@ export function registerAdminHandlers(): void {
       }
     });
   });
-
-  // Handle media uploads
-  bot.on('photo', async (msg) => {
-    await requireAdminPrivate(msg, async () => {
-      try {
-        await handleUploadMedia(msg);
-      } catch (error) {
-        logger.error('Error handling photo upload:', error);
-      }
-    });
-  });
-
-  bot.on('video', async (msg) => {
-    await requireAdminPrivate(msg, async () => {
-      try {
-        await handleUploadMedia(msg);
-      } catch (error) {
-        logger.error('Error handling video upload:', error);
-      }
-    });
-  });
-
-  bot.on('animation', async (msg) => {
-    await requireAdminPrivate(msg, async () => {
-      try {
-        await handleUploadMedia(msg);
-      } catch (error) {
-        logger.error('Error handling GIF upload:', error);
-      }
-    });
-  });
 }
-
