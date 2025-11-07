@@ -19,7 +19,7 @@ export async function handleStartCommand(msg: TelegramBot.Message): Promise<void
 🎰 Welcome to the SUI Raffle Bot!
 
 Here's how it works:
-• Buy tokens and automatically get raffle tickets (100 tickets per token)
+• Buy tokens and automatically get raffle tickets
 • Check your tickets with /mytickets
 • View the leaderboard with /leaderboard
 • Link your wallet with /linkwallet <address>
@@ -31,6 +31,8 @@ Commands:
 /leaderboard - View current raffle leaderboard
 /mytickets - Check your ticket count
 /linkwallet <address> - Link your wallet address
+/walletstatus - View your linked wallet
+/unlinkwallet - Unlink your current wallet
 
 Good luck! 🍀
     `.trim();
@@ -250,3 +252,100 @@ export async function handleLinkWalletCommand(msg: TelegramBot.Message): Promise
   });
 }
 
+export async function handleWalletStatusCommand(msg: TelegramBot.Message): Promise<void> {
+  return withRateLimit(msg, 'wallet_status', RATE_LIMITS.USER_COMMAND, async () => {
+    const chatId = msg.chat.id;
+    const userId = BigInt(msg.from!.id);
+    incrementCommand('walletstatus', false);
+    await analyticsService.trackActivity(userId, 'command', { command: 'walletstatus' });
+
+    try {
+      const walletUser = await prisma.walletUser.findFirst({
+        where: { telegramUserId: userId },
+      });
+
+      if (!walletUser) {
+        await bot.sendMessage(
+          chatId,
+          '❌ No wallet linked to your account.\n\n' +
+          'Link your wallet using:\n' +
+          '/linkwallet <your_wallet_address>\n\n' +
+          'Example: /linkwallet 0x1234567890abcdef...'
+        );
+        return;
+      }
+
+      const shortWallet = `${walletUser.walletAddress.slice(0, 8)}...${walletUser.walletAddress.slice(-6)}`;
+      const linkedDate = walletUser.linkedAt?.toLocaleString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'UTC'
+      }) || 'Unknown';
+
+      await bot.sendMessage(
+        chatId,
+        `👛 *Wallet Status*\n\n` +
+        `✅ Wallet Linked\n\n` +
+        `📍 Address: \`${walletUser.walletAddress}\`\n` +
+        `📍 Short: \`${shortWallet}\`\n` +
+        `📅 Linked: ${linkedDate} UTC\n\n` +
+        `To unlink this wallet, use /unlinkwallet`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (error) {
+      logger.error('Error fetching wallet status:', error);
+      await bot.sendMessage(chatId, '❌ Error fetching wallet status. Please try again.');
+    }
+  });
+}
+
+export async function handleUnlinkWalletCommand(msg: TelegramBot.Message): Promise<void> {
+  return withRateLimit(msg, 'unlink_wallet', RATE_LIMITS.USER_COMMAND, async () => {
+    const chatId = msg.chat.id;
+    const userId = BigInt(msg.from!.id);
+    incrementCommand('unlinkwallet', false);
+    await analyticsService.trackActivity(userId, 'command', { command: 'unlinkwallet' });
+
+    try {
+      const walletUser = await prisma.walletUser.findFirst({
+        where: { telegramUserId: userId },
+      });
+
+      if (!walletUser) {
+        await bot.sendMessage(
+          chatId,
+          '❌ No wallet is currently linked to your account.'
+        );
+        return;
+      }
+
+      const walletAddress = walletUser.walletAddress;
+      const shortWallet = `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}`;
+
+      // Delete the wallet user link
+      await prisma.walletUser.delete({
+        where: { walletAddress },
+      });
+
+      await bot.sendMessage(
+        chatId,
+        `✅ *Wallet Unlinked Successfully*\n\n` +
+        `The wallet \`${shortWallet}\` has been unlinked from your Telegram account.\n\n` +
+        `⚠️ Note: Any future purchases from this wallet will not earn raffle tickets unless you link it again.\n\n` +
+        `To link a wallet again, use:\n` +
+        `/linkwallet <your_wallet_address>`,
+        { parse_mode: 'Markdown' }
+      );
+
+      // Track wallet unlink activity
+      await analyticsService.trackActivity(userId, 'wallet_unlink', { walletAddress });
+    } catch (error) {
+      logger.error('Error unlinking wallet:', error);
+      await bot.sendMessage(chatId, '❌ Error unlinking wallet. Please try again.');
+    }
+  });
+}

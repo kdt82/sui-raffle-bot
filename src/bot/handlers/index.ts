@@ -1,6 +1,6 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
-import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand } from './user';
+import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand, handleWalletStatusCommand, handleUnlinkWalletCommand } from './user';
 import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
@@ -40,6 +40,22 @@ export function registerUserHandlers(): void {
       await handleLinkWalletCommand(msg);
     } catch (error) {
       logger.error('Error handling /linkwallet command:', error);
+    }
+  });
+
+  bot.onText(/\/walletstatus/, async (msg) => {
+    try {
+      await handleWalletStatusCommand(msg);
+    } catch (error) {
+      logger.error('Error handling /walletstatus command:', error);
+    }
+  });
+
+  bot.onText(/\/unlinkwallet/, async (msg) => {
+    try {
+      await handleUnlinkWalletCommand(msg);
+    } catch (error) {
+      logger.error('Error handling /unlinkwallet command:', error);
     }
   });
 
