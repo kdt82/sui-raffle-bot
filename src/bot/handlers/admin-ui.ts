@@ -166,8 +166,14 @@ export async function handleCreateRaffleStep(
     case 'create_raffle_minimum_purchase':
       await handleMinimumPurchaseStep(msg, data);
       break;
-    case 'create_raffle_media':
-      await handleMediaStep(msg, data);
+    case 'create_raffle_announcement_media':
+      await handleAnnouncementMediaStep(msg, data);
+      break;
+    case 'create_raffle_notification_media':
+      await handleNotificationMediaStep(msg, data);
+      break;
+    case 'create_raffle_leaderboard_media':
+      await handleLeaderboardMediaStep(msg, data);
       break;
     case 'create_raffle_review':
       await handleReviewStep(msg, data);
@@ -482,7 +488,7 @@ async function handleTicketRatioStep(msg: TelegramBot.Message, data: Record<stri
   await bot.sendMessage(
     chatId,
     `✅ Ticket Ratio: ${ratioExplanation}\n\n` +
-    `Step 7/8: Minimum Purchase (Optional)\n\n` +
+    `Step 7/11: Minimum Purchase (Optional)\n\n` +
     `Set a minimum token purchase amount to earn tickets.\n` +
     `Purchases below this amount will not earn tickets.\n\n` +
     `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -506,7 +512,7 @@ async function handleMinimumPurchaseStep(msg: TelegramBot.Message, data: Record<
 
   data.minimumPurchase = minimumPurchase;
   conversationManager.updateConversation(userId, chatId, {
-    step: 'create_raffle_media',
+    step: 'create_raffle_announcement_media',
     data,
   });
 
@@ -520,17 +526,17 @@ async function handleMinimumPurchaseStep(msg: TelegramBot.Message, data: Record<
   await bot.sendMessage(
     chatId,
     `✅ Minimum Purchase: ${minimumPurchase} tokens\n\n` +
-    `Step 8/8: Media Upload (Optional)\n\n` +
-    `📸 Send an image, video, or GIF for your raffle announcement.\n\n` +
-    `This media will be shown when users view the raffle details.\n\n` +
-    `Or click "Skip Media" to continue without media.`,
+    `Step 8/11: Announcement Media (Optional)\n\n` +
+    `� Send an image, video, or GIF for your raffle announcement.\n\n` +
+    `This media will be shown when announcing the raffle in the main chat.\n\n` +
+    `Or click "Skip" to continue without announcement media.`,
     {
       reply_markup: keyboard,
     }
   );
 }
 
-async function handleMediaStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+async function handleAnnouncementMediaStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
   const chatId = msg.chat.id;
   const userId = BigInt(msg.from!.id);
   
@@ -557,13 +563,133 @@ async function handleMediaStep(msg: TelegramBot.Message, data: Record<string, an
     await bot.sendMessage(
       chatId,
       '❌ Please send a valid image, video, or GIF.\n\n' +
-      'Or click "Skip Media" to continue without media.'
+      'Or click "Skip" to continue without announcement media.'
     );
     return;
   }
 
-  data.mediaUrl = mediaFileId;
-  data.mediaType = mediaType;
+  data.announcementMediaUrl = mediaFileId;
+  data.announcementMediaType = mediaType;
+  
+  conversationManager.updateConversation(userId, chatId, {
+    step: 'create_raffle_notification_media',
+    data,
+  });
+
+  const keyboard: TelegramBot.InlineKeyboardMarkup = {
+    inline_keyboard: [
+      [{ text: '⏭️ Skip', callback_data: 'skip_notification_media' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_announcement_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+    ],
+  };
+
+  await bot.sendMessage(
+    chatId,
+    `✅ Announcement Media: ${mediaType} attached\n\n` +
+    `Step 9/11: Notification Media (Optional)\n\n` +
+    `🎫 Send an image, video, or GIF for ticket notifications.\n\n` +
+    `This media will be shown when users receive tickets.\n\n` +
+    `Or click "Skip" to continue without notification media.`,
+    {
+      reply_markup: keyboard,
+    }
+  );
+}
+
+async function handleNotificationMediaStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
+  
+  let mediaFileId: string | undefined;
+  let mediaType: string | undefined;
+
+  // Check for photo
+  if (msg.photo && msg.photo.length > 0) {
+    const largestPhoto = msg.photo[msg.photo.length - 1];
+    mediaFileId = largestPhoto.file_id;
+    mediaType = MEDIA_TYPES.IMAGE;
+  }
+  // Check for video
+  else if (msg.video) {
+    mediaFileId = msg.video.file_id;
+    mediaType = MEDIA_TYPES.VIDEO;
+  }
+  // Check for animation (GIF)
+  else if (msg.animation) {
+    mediaFileId = msg.animation.file_id;
+    mediaType = MEDIA_TYPES.GIF;
+  }
+  else {
+    await bot.sendMessage(
+      chatId,
+      '❌ Please send a valid image, video, or GIF.\n\n' +
+      'Or click "Skip" to continue without notification media.'
+    );
+    return;
+  }
+
+  data.notificationMediaUrl = mediaFileId;
+  data.notificationMediaType = mediaType;
+  
+  conversationManager.updateConversation(userId, chatId, {
+    step: 'create_raffle_leaderboard_media',
+    data,
+  });
+
+  const keyboard: TelegramBot.InlineKeyboardMarkup = {
+    inline_keyboard: [
+      [{ text: '⏭️ Skip', callback_data: 'skip_leaderboard_media' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_notification_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+    ],
+  };
+
+  await bot.sendMessage(
+    chatId,
+    `✅ Notification Media: ${mediaType} attached\n\n` +
+    `Step 10/11: Leaderboard Media (Optional)\n\n` +
+    `🏆 Send an image, video, or GIF for the leaderboard.\n\n` +
+    `This media will be shown in leaderboard displays.\n\n` +
+    `Or click "Skip" to continue without leaderboard media.`,
+    {
+      reply_markup: keyboard,
+    }
+  );
+}
+
+async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
+  
+  let mediaFileId: string | undefined;
+  let mediaType: string | undefined;
+
+  // Check for photo
+  if (msg.photo && msg.photo.length > 0) {
+    const largestPhoto = msg.photo[msg.photo.length - 1];
+    mediaFileId = largestPhoto.file_id;
+    mediaType = MEDIA_TYPES.IMAGE;
+  }
+  // Check for video
+  else if (msg.video) {
+    mediaFileId = msg.video.file_id;
+    mediaType = MEDIA_TYPES.VIDEO;
+  }
+  // Check for animation (GIF)
+  else if (msg.animation) {
+    mediaFileId = msg.animation.file_id;
+    mediaType = MEDIA_TYPES.GIF;
+  }
+  else {
+    await bot.sendMessage(
+      chatId,
+      '❌ Please send a valid image, video, or GIF.\n\n' +
+      'Or click "Skip" to continue without leaderboard media.'
+    );
+    return;
+  }
+
+  data.leaderboardMediaUrl = mediaFileId;
+  data.leaderboardMediaType = mediaType;
   
   conversationManager.updateConversation(userId, chatId, {
     step: 'create_raffle_review',
@@ -581,7 +707,7 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
       [{ text: '✅ Confirm & Create', callback_data: 'confirm_create_raffle' }],
-      [{ text: '🔙 Back', callback_data: 'back_to_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
   };
 
@@ -602,9 +728,17 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     ? `\nMinimum Purchase: ${data.minimumPurchase} tokens` 
     : '\nMinimum Purchase: None';
     
-  const mediaText = data.mediaUrl && data.mediaType
-    ? `\nMedia: ${data.mediaType} attached`
-    : '\nMedia: None';
+  const announcementMediaText = data.announcementMediaUrl && data.announcementMediaType
+    ? `\nAnnouncement Media: ${data.announcementMediaType} attached`
+    : '\nAnnouncement Media: None';
+    
+  const notificationMediaText = data.notificationMediaUrl && data.notificationMediaType
+    ? `\nNotification Media: ${data.notificationMediaType} attached`
+    : '\nNotification Media: None';
+    
+  const leaderboardMediaText = data.leaderboardMediaUrl && data.leaderboardMediaType
+    ? `\nLeaderboard Media: ${data.leaderboardMediaType} attached`
+    : '\nLeaderboard Media: None';
 
   await bot.sendMessage(
     chatId,
@@ -613,7 +747,7 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     `DEX: ${dexDisplay}\n` +
     `Prize Type: ${data.prizeType}\n` +
     `Prize Amount: ${data.prizeAmount}\n` +
-    `Ticket Ratio: ${ratioDisplay}${minimumText}${mediaText}\n\n` +
+    `Ticket Ratio: ${ratioDisplay}${minimumText}${announcementMediaText}${notificationMediaText}${leaderboardMediaText}\n\n` +
     `Please review and confirm:`,
     {
       parse_mode: 'Markdown',
@@ -621,6 +755,7 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     }
   );
 }
+
 // Callback query handlers
 export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuery): Promise<void> {
   const chatId = query.message!.chat.id;
@@ -720,7 +855,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id, { text: 'Set to 100 tickets per token' });
       await bot.editMessageText(
         `✅ Ticket Ratio: 100 tickets per token\n\n` +
-        `Step 7/8: Minimum Purchase (Optional)\n\n` +
+        `Step 7/11: Minimum Purchase (Optional)\n\n` +
         `Set a minimum token purchase amount to earn tickets.\n` +
         `Purchases below this amount will not earn tickets.\n\n` +
         `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -744,7 +879,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
     if (callbackData === 'skip_minimum_purchase') {
       conversation.data.minimumPurchase = null;
       conversationManager.updateConversation(userId, chatId, {
-        step: 'create_raffle_media',
+        step: 'create_raffle_announcement_media',
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id, { text: 'Skipped minimum purchase' });
@@ -768,14 +903,70 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       return;
     }
 
-    if (callbackData === 'skip_media') {
-      conversation.data.mediaUrl = null;
-      conversation.data.mediaType = null;
+    if (callbackData === 'skip_announcement_media') {
+      conversation.data.announcementMediaUrl = null;
+      conversation.data.announcementMediaType = null;
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_notification_media',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: 'Skipped announcement media' });
+      await bot.editMessageText(
+        `✅ Announcement Media: None\n\n` +
+        `Step 9/11: Notification Media (Optional)\n\n` +
+        `🎫 Send an image, video, or GIF for ticket notifications.\n\n` +
+        `This media will be shown when users receive tickets.\n\n` +
+        `Or click "Skip" to continue without notification media.`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏭️ Skip', callback_data: 'skip_notification_media' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_announcement_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'skip_notification_media') {
+      conversation.data.notificationMediaUrl = null;
+      conversation.data.notificationMediaType = null;
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_leaderboard_media',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: 'Skipped notification media' });
+      await bot.editMessageText(
+        `✅ Notification Media: None\n\n` +
+        `Step 10/11: Leaderboard Media (Optional)\n\n` +
+        `🏆 Send an image, video, or GIF for the leaderboard.\n\n` +
+        `This media will be shown in leaderboard displays.\n\n` +
+        `Or click "Skip" to continue without leaderboard media.`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏭️ Skip', callback_data: 'skip_leaderboard_media' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_notification_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'skip_leaderboard_media') {
+      conversation.data.leaderboardMediaUrl = null;
+      conversation.data.leaderboardMediaType = null;
       conversationManager.updateConversation(userId, chatId, {
         step: 'create_raffle_review',
         data: conversation.data,
       });
-      await bot.answerCallbackQuery(query.id, { text: 'Skipped media upload' });
+      await bot.answerCallbackQuery(query.id, { text: 'Skipped leaderboard media' });
       await showReviewStep(chatId, conversation.data);
       return;
     }
@@ -985,7 +1176,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       
       await bot.editMessageText(
         `✅ Ticket Ratio: ${ratioDisplay}\n\n` +
-        `Step 7/8: Minimum Purchase (Optional)\n\n` +
+        `Step 7/11: Minimum Purchase (Optional)\n\n` +
         `Set a minimum token purchase amount to earn tickets.\n` +
         `Purchases below this amount will not earn tickets.\n\n` +
         `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -1008,7 +1199,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
 
     if (callbackData === 'back_to_media') {
       conversationManager.updateConversation(userId, chatId, {
-        step: 'create_raffle_media',
+        step: 'create_raffle_announcement_media',
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
@@ -1019,17 +1210,110 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       
       await bot.editMessageText(
         `✅ Minimum Purchase: ${minimumText}\n\n` +
-        `Step 8/8: Media Upload (Optional)\n\n` +
-        `📸 Send an image, video, or GIF for your raffle announcement.\n\n` +
-        `This media will be shown when users view the raffle details.\n\n` +
-        `Or click "Skip Media" to continue without media.`,
+        `Step 8/11: Announcement Media (Optional)\n\n` +
+        `📸 Send an image, video, or GIF for the main chat announcement.\n\n` +
+        `This media will be shown when the raffle is announced to the group.\n\n` +
+        `Or click "Skip" to continue without announcement media.`,
         {
           chat_id: chatId,
           message_id: query.message!.message_id,
           reply_markup: {
             inline_keyboard: [
-              [{ text: '⏭️ Skip Media', callback_data: 'skip_media' }],
+              [{ text: '⏭️ Skip Announcement Media', callback_data: 'skip_announcement_media' }],
               [{ text: '🔙 Back', callback_data: 'back_to_minimum_purchase' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'back_to_announcement_media') {
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_announcement_media',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id);
+      
+      const minimumText = conversation.data.minimumPurchase
+        ? `${conversation.data.minimumPurchase} tokens`
+        : 'None';
+      
+      await bot.editMessageText(
+        `✅ Minimum Purchase: ${minimumText}\n\n` +
+        `Step 8/11: Announcement Media (Optional)\n\n` +
+        `📸 Send an image, video, or GIF for the main chat announcement.\n\n` +
+        `This media will be shown when the raffle is announced to the group.\n\n` +
+        `Or click "Skip" to continue without announcement media.`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏭️ Skip Announcement Media', callback_data: 'skip_announcement_media' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_minimum_purchase' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'back_to_notification_media') {
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_notification_media',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id);
+      
+      const announcementMediaText = conversation.data.announcementMediaUrl
+        ? `${conversation.data.announcementMediaType} attached`
+        : 'None';
+      
+      await bot.editMessageText(
+        `✅ Announcement Media: ${announcementMediaText}\n\n` +
+        `Step 9/11: Notification Media (Optional)\n\n` +
+        `📸 Send an image, video, or GIF for user notifications.\n\n` +
+        `This media will be shown when users are notified about ticket allocations.\n\n` +
+        `Or click "Skip" to continue without notification media.`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏭️ Skip Notification Media', callback_data: 'skip_notification_media' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_announcement_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'back_to_leaderboard_media') {
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_leaderboard_media',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id);
+      
+      const notificationMediaText = conversation.data.notificationMediaUrl
+        ? `${conversation.data.notificationMediaType} attached`
+        : 'None';
+      
+      await bot.editMessageText(
+        `✅ Notification Media: ${notificationMediaText}\n\n` +
+        `Step 10/11: Leaderboard Media (Optional)\n\n` +
+        `📸 Send an image, video, or GIF for leaderboard displays.\n\n` +
+        `This media will be shown when the leaderboard is displayed.\n\n` +
+        `Or click "Skip" to continue without leaderboard media.`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏭️ Skip Leaderboard Media', callback_data: 'skip_leaderboard_media' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_notification_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
             ],
           },
         }
@@ -1054,8 +1338,14 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         prizeAmount: data.prizeAmount,
         ticketsPerToken: data.ticketsPerToken || '100',
         minimumPurchase: data.minimumPurchase || null,
-        mediaUrl: data.mediaUrl || null,
-        mediaType: data.mediaType || null,
+        mediaUrl: data.mediaUrl || null,  // Deprecated, kept for backwards compatibility
+        mediaType: data.mediaType || null,  // Deprecated, kept for backwards compatibility
+        announcementMediaUrl: data.announcementMediaUrl || null,
+        announcementMediaType: data.announcementMediaType || null,
+        notificationMediaUrl: data.notificationMediaUrl || null,
+        notificationMediaType: data.notificationMediaType || null,
+        leaderboardMediaUrl: data.leaderboardMediaUrl || null,
+        leaderboardMediaType: data.leaderboardMediaType || null,
         status: RAFFLE_STATUS.ACTIVE,
       },
     });
