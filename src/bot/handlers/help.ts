@@ -177,7 +177,11 @@ export async function handleWalletListCommand(msg: TelegramBot.Message): Promise
 
     } catch (error) {
       logger.error('Error fetching wallet list:', error);
-      await bot.sendMessage(chatId, '❌ Error fetching wallet list. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await bot.sendMessage(
+        chatId, 
+        `❌ Error fetching wallet list: ${errorMessage}\n\nPlease check the logs and try again.`
+      );
     }
   });
 }
