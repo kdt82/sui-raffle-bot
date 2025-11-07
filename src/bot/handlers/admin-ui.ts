@@ -866,7 +866,15 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
 
   const conversation = conversationManager.getConversation(userId, chatId);
   if (!conversation || !conversation.step.startsWith('create_raffle')) {
-    await bot.answerCallbackQuery(query.id, { text: 'Conversation expired or invalid' });
+    await bot.answerCallbackQuery(query.id, { text: 'Session expired. Please start over with /create_raffle' });
+    await bot.editMessageText(
+      '⚠️ Your raffle creation session has expired.\n\n' +
+      'Please use /create_raffle to start a new raffle.',
+      {
+        chat_id: chatId,
+        message_id: query.message!.message_id,
+      }
+    );
     return;
   }
 
@@ -1517,6 +1525,8 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
     // Send announcement to main chat
     if (MAIN_CHAT_ID) {
       try {
+        logger.info(`Attempting to send raffle announcement to MAIN_CHAT_ID: ${MAIN_CHAT_ID}`);
+        
         const minimumPurchaseText = raffle.minimumPurchase
           ? `\n\n🎫 **Minimum Purchase for Eligibility:** ${raffle.minimumPurchase} tokens`
           : '';
@@ -1557,6 +1567,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
 
         // Send with media if available
         if (raffle.announcementMediaUrl && raffle.announcementMediaType) {
+          logger.info(`Sending announcement with media type: ${raffle.announcementMediaType}`);
           if (raffle.announcementMediaType === 'image') {
             await bot.sendPhoto(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
               caption: announcementMessage,
@@ -1574,12 +1585,27 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
             });
           }
         } else {
+          logger.info('Sending announcement without media');
           await bot.sendMessage(MAIN_CHAT_ID, announcementMessage, { parse_mode: 'Markdown' });
         }
-        logger.info(`Raffle announcement sent to main chat: ${raffle.id}`);
+        logger.info(`✅ Raffle announcement sent successfully to main chat: ${raffle.id}`);
       } catch (error) {
-        logger.error('Error sending raffle announcement to main chat:', error);
+        logger.error('❌ Error sending raffle announcement to main chat:', error);
+        // Also notify the admin that announcement failed
+        await bot.sendMessage(
+          chatId,
+          `⚠️ Warning: Raffle created but announcement to main chat failed.\n` +
+          `Error: ${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
+          `Please check MAIN_CHAT_ID configuration and bot permissions.`
+        );
       }
+    } else {
+      logger.warn('MAIN_CHAT_ID not configured - skipping raffle announcement');
+      await bot.sendMessage(
+        chatId,
+        `⚠️ Warning: MAIN_CHAT_ID not configured.\n` +
+        `Raffle created but not announced to main chat.`
+      );
     }
   } catch (error) {
     logger.error('Error creating raffle:', error);
