@@ -1568,21 +1568,59 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         // Send with media if available
         if (raffle.announcementMediaUrl && raffle.announcementMediaType) {
           logger.info(`Sending announcement with media type: ${raffle.announcementMediaType}`);
+          
+          let sentSuccessfully = false;
+          
+          // Try to send as photo/video/animation first
           if (raffle.announcementMediaType === 'image') {
-            await bot.sendPhoto(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
-              caption: announcementMessage,
-              parse_mode: 'Markdown',
-            });
+            try {
+              await bot.sendPhoto(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+                caption: announcementMessage,
+                parse_mode: 'Markdown',
+              });
+              sentSuccessfully = true;
+            } catch (photoError: any) {
+              // If it fails because it's a document, try sendDocument instead
+              if (photoError?.message?.includes('Document as Photo')) {
+                logger.warn('Photo is actually a document, sending as document instead');
+                await bot.sendDocument(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+                  caption: announcementMessage,
+                  parse_mode: 'Markdown',
+                });
+                sentSuccessfully = true;
+              } else {
+                throw photoError; // Re-throw if it's a different error
+              }
+            }
           } else if (raffle.announcementMediaType === 'video') {
-            await bot.sendVideo(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
-              caption: announcementMessage,
-              parse_mode: 'Markdown',
-            });
+            try {
+              await bot.sendVideo(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+                caption: announcementMessage,
+                parse_mode: 'Markdown',
+              });
+              sentSuccessfully = true;
+            } catch (videoError: any) {
+              if (videoError?.message?.includes('Document as Video')) {
+                logger.warn('Video is actually a document, sending as document instead');
+                await bot.sendDocument(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+                  caption: announcementMessage,
+                  parse_mode: 'Markdown',
+                });
+                sentSuccessfully = true;
+              } else {
+                throw videoError;
+              }
+            }
           } else if (raffle.announcementMediaType === 'gif') {
             await bot.sendAnimation(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
               caption: announcementMessage,
               parse_mode: 'Markdown',
             });
+            sentSuccessfully = true;
+          }
+          
+          if (!sentSuccessfully) {
+            throw new Error('Failed to send announcement media');
           }
         } else {
           logger.info('Sending announcement without media');

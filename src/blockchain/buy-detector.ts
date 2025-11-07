@@ -1088,15 +1088,39 @@ export class BuyDetector {
 
       if (mediaUrl && mediaType) {
         if (mediaType === 'image') {
-          await bot.sendPhoto(broadcastChannelId, mediaUrl, {
-            caption: message,
-            parse_mode: 'Markdown',
-          });
+          try {
+            await bot.sendPhoto(broadcastChannelId, mediaUrl, {
+              caption: message,
+              parse_mode: 'Markdown',
+            });
+          } catch (photoError: any) {
+            if (photoError?.message?.includes('Document as Photo')) {
+              logger.warn('Photo is actually a document, sending as document instead');
+              await bot.sendDocument(broadcastChannelId, mediaUrl, {
+                caption: message,
+                parse_mode: 'Markdown',
+              });
+            } else {
+              throw photoError;
+            }
+          }
         } else if (mediaType === 'video') {
-          await bot.sendVideo(broadcastChannelId, mediaUrl, {
-            caption: message,
-            parse_mode: 'Markdown',
-          });
+          try {
+            await bot.sendVideo(broadcastChannelId, mediaUrl, {
+              caption: message,
+              parse_mode: 'Markdown',
+            });
+          } catch (videoError: any) {
+            if (videoError?.message?.includes('Document as Video')) {
+              logger.warn('Video is actually a document, sending as document instead');
+              await bot.sendDocument(broadcastChannelId, mediaUrl, {
+                caption: message,
+                parse_mode: 'Markdown',
+              });
+            } else {
+              throw videoError;
+            }
+          }
         } else if (mediaType === 'gif') {
           await bot.sendAnimation(broadcastChannelId, mediaUrl, {
             caption: message,

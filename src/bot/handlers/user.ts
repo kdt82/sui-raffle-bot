@@ -88,15 +88,37 @@ export async function handleLeaderboardCommand(msg: TelegramBot.Message): Promis
       // Send with leaderboard media if available
       if (activeRaffle.leaderboardMediaUrl && activeRaffle.leaderboardMediaType) {
         if (activeRaffle.leaderboardMediaType === 'image') {
-          await bot.sendPhoto(chatId, activeRaffle.leaderboardMediaUrl, {
-            caption: leaderboardMessage,
-            parse_mode: 'Markdown',
-          });
+          try {
+            await bot.sendPhoto(chatId, activeRaffle.leaderboardMediaUrl, {
+              caption: leaderboardMessage,
+              parse_mode: 'Markdown',
+            });
+          } catch (photoError: any) {
+            if (photoError?.message?.includes('Document as Photo')) {
+              await bot.sendDocument(chatId, activeRaffle.leaderboardMediaUrl, {
+                caption: leaderboardMessage,
+                parse_mode: 'Markdown',
+              });
+            } else {
+              throw photoError;
+            }
+          }
         } else if (activeRaffle.leaderboardMediaType === 'video') {
-          await bot.sendVideo(chatId, activeRaffle.leaderboardMediaUrl, {
-            caption: leaderboardMessage,
-            parse_mode: 'Markdown',
-          });
+          try {
+            await bot.sendVideo(chatId, activeRaffle.leaderboardMediaUrl, {
+              caption: leaderboardMessage,
+              parse_mode: 'Markdown',
+            });
+          } catch (videoError: any) {
+            if (videoError?.message?.includes('Document as Video')) {
+              await bot.sendDocument(chatId, activeRaffle.leaderboardMediaUrl, {
+                caption: leaderboardMessage,
+                parse_mode: 'Markdown',
+              });
+            } else {
+              throw videoError;
+            }
+          }
         } else if (activeRaffle.leaderboardMediaType === 'gif') {
           await bot.sendAnimation(chatId, activeRaffle.leaderboardMediaUrl, {
             caption: leaderboardMessage,
