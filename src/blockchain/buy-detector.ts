@@ -8,6 +8,29 @@ import { RAFFLE_STATUS, DEFAULT_TICKETS_PER_TOKEN } from '../utils/constants';
 import { getRedisClient } from '../utils/redis';
 import { bot } from '../bot';
 
+// Helper function to calculate countdown time remaining
+function getCountdownText(endTime: Date): string {
+  const now = new Date();
+  const diff = endTime.getTime() - now.getTime();
+  
+  if (diff <= 0) {
+    return '⏱️ Raffle Ended';
+  }
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+  
+  return `⏱️ Time Remaining: ${parts.join(' ')}`;
+}
+
 export const BUY_EVENTS_QUEUE = 'buy-events';
 
 let buyEventsQueue: Queue | null = null;
@@ -1045,6 +1068,9 @@ export class BuyDetector {
         ? `\n💎 Minimum Purchase: \`${raffle.minimumPurchase}\` tokens` 
         : '';
 
+      // Calculate countdown
+      const countdown = getCountdownText(raffle.endTime);
+
       const message =
         `🎉 *NEW BUY DETECTED!* 🎉\n\n` +
         `💰 Amount: \`${data.tokenAmount}\` tokens\n` +
@@ -1052,7 +1078,8 @@ export class BuyDetector {
         `👛 Wallet: \`${shortWallet}\`\n` +
         `🔗 Source: \`On-chain\`\n\n` +
         `🏆 Prize Pool: \`${raffle.prizeAmount} ${raffle.prizeType}\`\n` +
-        `⏰ Raffle Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC${minimumText}\n\n` +
+        `${countdown}\n` +
+        `📅 Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC${minimumText}\n\n` +
         `_Every 1 token purchased = 100 raffle tickets!_`;
 
       if (raffle.mediaUrl && raffle.mediaType) {
