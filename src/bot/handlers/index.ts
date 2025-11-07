@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
@@ -295,6 +295,26 @@ export function registerAdminHandlers(): void {
         await handleBackupCleanupCommand(msg);
       } catch (error) {
         logger.error('Error handling /backup_cleanup command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/add_tickets/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleAddTickets(msg);
+      } catch (error) {
+        logger.error('Error handling /add_tickets command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/remove_tickets/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleRemoveTickets(msg);
+      } catch (error) {
+        logger.error('Error handling /remove_tickets command:', error);
       }
     });
   });

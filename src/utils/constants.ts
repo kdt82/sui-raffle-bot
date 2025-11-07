@@ -50,3 +50,5 @@ export function getDexDisplayName(dex: DexType): string {
   return DEX_LABELS[dex] ?? dex;
 }
 
+// Main chat ID for raffle announcements
+export const MAIN_CHAT_ID = process.env.MAIN_CHAT_ID || '';

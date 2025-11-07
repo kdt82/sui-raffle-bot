@@ -64,6 +64,8 @@ npm run dev
 - `/create_raffle` - Create a new raffle (requires DEX selection)
 - `/set_prize` - Set prize details for active raffle
 - `/set_minimum_purchase <amount>` - Set minimum token purchase to earn tickets
+- `/add_tickets <wallet_address> <count>` - Manually add tickets to a user for the active raffle
+- `/remove_tickets <wallet_address> <count>` - Manually remove tickets from a user for the active raffle
 - `/upload_media` - Upload media for raffle
 - `/award_prize` - Award prize to winner
 - `/config` - Configure raffle settings

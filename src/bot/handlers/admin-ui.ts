@@ -2,7 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
 import { prisma } from '../../utils/database';
 import { logger } from '../../utils/logger';
-import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX, getDexDisplayName, DexType } from '../../utils/constants';
+import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX, getDexDisplayName, DexType, MAIN_CHAT_ID } from '../../utils/constants';
 import { conversationManager } from '../conversation';
 
 // UI Mode: Interactive wizard with buttons
@@ -892,6 +892,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       ? `\nMinimum Purchase: ${raffle.minimumPurchase} tokens` 
       : '';
 
+    // Send confirmation to admin
     await bot.sendMessage(
       chatId,
       `✅ **Raffle Created Successfully!**\n\n` +
@@ -904,6 +905,55 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       `Ticket Ratio: ${ratioDisplay}${minimumText}`,
       { parse_mode: 'Markdown' }
     );
+
+    // Send announcement to main chat
+    if (MAIN_CHAT_ID) {
+      try {
+        const minimumPurchaseText = raffle.minimumPurchase
+          ? `\n\n🎫 **Minimum Purchase for Eligibility:** ${raffle.minimumPurchase} tokens`
+          : '';
+
+        const ticketExplanation = ratio >= 1
+          ? `For every token you purchase, you'll receive **${ratio} raffle tickets**!`
+          : `For every **${Math.round(1 / ratio).toLocaleString()} tokens** you purchase, you'll receive **1 raffle ticket**!`;
+
+        await bot.sendMessage(
+          MAIN_CHAT_ID,
+          `🎉 **A New Raffle Has Been Scheduled!** 🎉\n\n` +
+          `💰 **Prize:** ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
+          `📅 **Start:** ${raffle.startTime.toLocaleString('en-US', { 
+            weekday: 'short', 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'UTC'
+          })} UTC\n` +
+          `📅 **End:** ${raffle.endTime.toLocaleString('en-US', { 
+            weekday: 'short', 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'UTC'
+          })} UTC\n\n` +
+          `📝 **Contract Address:**\n\`${raffle.ca}\`${minimumPurchaseText}\n\n` +
+          `🎟️ **Ticket Allocation:**\n${ticketExplanation}\n\n` +
+          `🔗 **How to Enter:**\n` +
+          `1. Link your wallet using /linkwallet <your_wallet_address>\n` +
+          `2. Purchase tokens during the raffle period\n` +
+          `3. Tickets are automatically allocated based on your purchases\n\n` +
+          `⚠️ **Important:** You must link your wallet to receive tickets. You only need to do this once!\n\n` +
+          `Good luck! 🍀`,
+          { parse_mode: 'Markdown' }
+        );
+        logger.info(`Raffle announcement sent to main chat: ${raffle.id}`);
+      } catch (error) {
+        logger.error('Error sending raffle announcement to main chat:', error);
+      }
+    }
   } catch (error) {
     logger.error('Error creating raffle:', error);
     await bot.sendMessage(chatId, '❌ Error creating raffle. Please try again.');

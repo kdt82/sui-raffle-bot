@@ -583,3 +583,207 @@ export async function handleResetTickets(msg: TelegramBot.Message): Promise<void
   }
 }
 
+export async function handleAddTickets(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const args = msg.text?.split(' ').slice(1);
+
+  if (!args || args.length < 2) {
+    await bot.sendMessage(
+      chatId,
+      '❌ *Invalid Command Format*\n\n' +
+      '*Usage:* `/add_tickets <wallet_address> <ticket_count>`\n\n' +
+      '*Example:* `/add_tickets 0x1234...abcd 500`\n\n' +
+      'This will add tickets to the user for the active raffle.',
+      { parse_mode: 'Markdown' }
+    );
+    return;
+  }
+
+  const walletAddress = args[0].trim();
+  const ticketCount = parseInt(args[1]);
+
+  if (isNaN(ticketCount) || ticketCount <= 0) {
+    await bot.sendMessage(chatId, '❌ Ticket count must be a positive number.');
+    return;
+  }
+
+  try {
+    // Find active raffle
+    const activeRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: RAFFLE_STATUS.ACTIVE,
+        startTime: { lte: new Date() },
+        endTime: { gt: new Date() },
+      },
+    });
+
+    if (!activeRaffle) {
+      await bot.sendMessage(chatId, '❌ No active raffle found.');
+      return;
+    }
+
+    // Find or create ticket record
+    const existingTicket = await prisma.ticket.findUnique({
+      where: {
+        raffleId_walletAddress: {
+          raffleId: activeRaffle.id,
+          walletAddress: walletAddress,
+        },
+      },
+    });
+
+    if (existingTicket) {
+      // Update existing tickets
+      const updatedTicket = await prisma.ticket.update({
+        where: { id: existingTicket.id },
+        data: {
+          ticketCount: existingTicket.ticketCount + ticketCount,
+        },
+      });
+
+      await bot.sendMessage(
+        chatId,
+        `✅ *Tickets Added Successfully!*\n\n` +
+        `👤 Wallet: \`${walletAddress}\`\n` +
+        `➕ Added: *${ticketCount}* tickets\n` +
+        `🎫 Previous: ${existingTicket.ticketCount} tickets\n` +
+        `🎫 New Total: *${updatedTicket.ticketCount}* tickets\n\n` +
+        `Raffle ID: \`${activeRaffle.id}\``,
+        { parse_mode: 'Markdown' }
+      );
+
+      logger.info(`Admin added ${ticketCount} tickets to ${walletAddress} for raffle ${activeRaffle.id}. New total: ${updatedTicket.ticketCount}`);
+    } else {
+      // Create new ticket record
+      const newTicket = await prisma.ticket.create({
+        data: {
+          raffleId: activeRaffle.id,
+          walletAddress: walletAddress,
+          ticketCount: ticketCount,
+        },
+      });
+
+      await bot.sendMessage(
+        chatId,
+        `✅ *Tickets Added Successfully!*\n\n` +
+        `👤 Wallet: \`${walletAddress}\`\n` +
+        `🎫 Total Tickets: *${newTicket.ticketCount}*\n\n` +
+        `Raffle ID: \`${activeRaffle.id}\`\n\n` +
+        `_This is a new participant in the raffle._`,
+        { parse_mode: 'Markdown' }
+      );
+
+      logger.info(`Admin created ticket record with ${ticketCount} tickets for ${walletAddress} in raffle ${activeRaffle.id}`);
+    }
+  } catch (error) {
+    logger.error('Error adding tickets:', error);
+    await bot.sendMessage(chatId, '❌ Failed to add tickets. Please check the wallet address format and try again.');
+  }
+}
+
+export async function handleRemoveTickets(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const args = msg.text?.split(' ').slice(1);
+
+  if (!args || args.length < 2) {
+    await bot.sendMessage(
+      chatId,
+      '❌ *Invalid Command Format*\n\n' +
+      '*Usage:* `/remove_tickets <wallet_address> <ticket_count>`\n\n' +
+      '*Example:* `/remove_tickets 0x1234...abcd 100`\n\n' +
+      'This will remove tickets from the user for the active raffle.',
+      { parse_mode: 'Markdown' }
+    );
+    return;
+  }
+
+  const walletAddress = args[0].trim();
+  const ticketCount = parseInt(args[1]);
+
+  if (isNaN(ticketCount) || ticketCount <= 0) {
+    await bot.sendMessage(chatId, '❌ Ticket count must be a positive number.');
+    return;
+  }
+
+  try {
+    // Find active raffle
+    const activeRaffle = await prisma.raffle.findFirst({
+      where: {
+        status: RAFFLE_STATUS.ACTIVE,
+        startTime: { lte: new Date() },
+        endTime: { gt: new Date() },
+      },
+    });
+
+    if (!activeRaffle) {
+      await bot.sendMessage(chatId, '❌ No active raffle found.');
+      return;
+    }
+
+    // Find existing ticket record
+    const existingTicket = await prisma.ticket.findUnique({
+      where: {
+        raffleId_walletAddress: {
+          raffleId: activeRaffle.id,
+          walletAddress: walletAddress,
+        },
+      },
+    });
+
+    if (!existingTicket) {
+      await bot.sendMessage(
+        chatId,
+        `❌ No tickets found for wallet: \`${walletAddress}\` in the active raffle.`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
+    const newTicketCount = existingTicket.ticketCount - ticketCount;
+
+    if (newTicketCount <= 0) {
+      // Delete the ticket record entirely
+      await prisma.ticket.delete({
+        where: { id: existingTicket.id },
+      });
+
+      await bot.sendMessage(
+        chatId,
+        `✅ *Tickets Removed Successfully!*\n\n` +
+        `👤 Wallet: \`${walletAddress}\`\n` +
+        `➖ Removed: *${ticketCount}* tickets\n` +
+        `🎫 Previous: ${existingTicket.ticketCount} tickets\n` +
+        `🎫 New Total: *0* tickets\n\n` +
+        `⚠️ User has been removed from the raffle (no tickets remaining).\n\n` +
+        `Raffle ID: \`${activeRaffle.id}\``,
+        { parse_mode: 'Markdown' }
+      );
+
+      logger.info(`Admin removed all tickets from ${walletAddress} for raffle ${activeRaffle.id}. Ticket record deleted.`);
+    } else {
+      // Update ticket count
+      const updatedTicket = await prisma.ticket.update({
+        where: { id: existingTicket.id },
+        data: {
+          ticketCount: newTicketCount,
+        },
+      });
+
+      await bot.sendMessage(
+        chatId,
+        `✅ *Tickets Removed Successfully!*\n\n` +
+        `👤 Wallet: \`${walletAddress}\`\n` +
+        `➖ Removed: *${ticketCount}* tickets\n` +
+        `🎫 Previous: ${existingTicket.ticketCount} tickets\n` +
+        `🎫 New Total: *${updatedTicket.ticketCount}* tickets\n\n` +
+        `Raffle ID: \`${activeRaffle.id}\``,
+        { parse_mode: 'Markdown' }
+      );
+
+      logger.info(`Admin removed ${ticketCount} tickets from ${walletAddress} for raffle ${activeRaffle.id}. New total: ${updatedTicket.ticketCount}`);
+    }
+  } catch (error) {
+    logger.error('Error removing tickets:', error);
+    await bot.sendMessage(chatId, '❌ Failed to remove tickets. Please check the wallet address format and try again.');
+  }
+}
