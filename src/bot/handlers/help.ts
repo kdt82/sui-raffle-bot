@@ -4,6 +4,7 @@ import { logger } from '../../utils/logger';
 import { withRateLimit } from '../rate-limit-middleware';
 import { RATE_LIMITS } from '../../utils/rate-limiter';
 import { incrementCommand } from '../../utils/metrics';
+import { prisma } from '../../utils/database';
 
 /**
  * Admin command reference - Lists all available commands with usage
@@ -98,8 +99,6 @@ export async function handleWalletListCommand(msg: TelegramBot.Message): Promise
     incrementCommand('walletlist', true);
 
     try {
-      const { prisma } = await import('../../utils/database');
-
       // Get all linked wallets
       const walletUsers = await prisma.walletUser.findMany({
         orderBy: { linkedAt: 'desc' },
