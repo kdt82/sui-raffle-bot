@@ -1525,8 +1525,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
           ? `For every token you purchase, you'll receive **${ratio} raffle tickets**!`
           : `For every **${Math.round(1 / ratio).toLocaleString()} tokens** you purchase, you'll receive **1 raffle ticket**!`;
 
-        await bot.sendMessage(
-          MAIN_CHAT_ID,
+        const announcementMessage =
           `🎉 **A New Raffle Has Been Scheduled!** 🎉\n\n` +
           `💰 **Prize:** ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
           `📅 **Start:** ${raffle.startTime.toLocaleString('en-US', { 
@@ -1554,9 +1553,29 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
           `2. Purchase tokens during the raffle period\n` +
           `3. Tickets are automatically allocated based on your purchases\n\n` +
           `⚠️ **Important:** You must link your wallet to receive tickets. You only need to do this once!\n\n` +
-          `Good luck! 🍀`,
-          { parse_mode: 'Markdown' }
-        );
+          `Good luck! 🍀`;
+
+        // Send with media if available
+        if (raffle.announcementMediaUrl && raffle.announcementMediaType) {
+          if (raffle.announcementMediaType === 'image') {
+            await bot.sendPhoto(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+              caption: announcementMessage,
+              parse_mode: 'Markdown',
+            });
+          } else if (raffle.announcementMediaType === 'video') {
+            await bot.sendVideo(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+              caption: announcementMessage,
+              parse_mode: 'Markdown',
+            });
+          } else if (raffle.announcementMediaType === 'gif') {
+            await bot.sendAnimation(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+              caption: announcementMessage,
+              parse_mode: 'Markdown',
+            });
+          }
+        } else {
+          await bot.sendMessage(MAIN_CHAT_ID, announcementMessage, { parse_mode: 'Markdown' });
+        }
         logger.info(`Raffle announcement sent to main chat: ${raffle.id}`);
       } catch (error) {
         logger.error('Error sending raffle announcement to main chat:', error);

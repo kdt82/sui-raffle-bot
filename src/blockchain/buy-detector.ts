@@ -1082,19 +1082,23 @@ export class BuyDetector {
         `📅 Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC${minimumText}\n\n` +
         `_Every 1 token purchased = 100 raffle tickets!_`;
 
-      if (raffle.mediaUrl && raffle.mediaType) {
-        if (raffle.mediaType === 'image') {
-          await bot.sendPhoto(broadcastChannelId, raffle.mediaUrl, {
+      // Use notification media if available, otherwise fall back to old media fields
+      const mediaUrl = raffle.notificationMediaUrl || raffle.mediaUrl;
+      const mediaType = raffle.notificationMediaType || raffle.mediaType;
+
+      if (mediaUrl && mediaType) {
+        if (mediaType === 'image') {
+          await bot.sendPhoto(broadcastChannelId, mediaUrl, {
             caption: message,
             parse_mode: 'Markdown',
           });
-        } else if (raffle.mediaType === 'video') {
-          await bot.sendVideo(broadcastChannelId, raffle.mediaUrl, {
+        } else if (mediaType === 'video') {
+          await bot.sendVideo(broadcastChannelId, mediaUrl, {
             caption: message,
             parse_mode: 'Markdown',
           });
-        } else if (raffle.mediaType === 'gif') {
-          await bot.sendAnimation(broadcastChannelId, raffle.mediaUrl, {
+        } else if (mediaType === 'gif') {
+          await bot.sendAnimation(broadcastChannelId, mediaUrl, {
             caption: message,
             parse_mode: 'Markdown',
           });
