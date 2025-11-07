@@ -5,6 +5,24 @@ import { logger } from '../../utils/logger';
 import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX, getDexDisplayName, DexType, MAIN_CHAT_ID } from '../../utils/constants';
 import { conversationManager } from '../conversation';
 
+// Helper function to extract token symbol from contract address
+// Example: 0xab954d078dab0a6727ce58388931850be4bdb6f72703ea3cad3d6eb0c12a0283::aqua::AQUA -> AQUA
+function extractTokenSymbolFromCA(ca: string): string {
+  try {
+    // Split by :: and get the last part (the token symbol)
+    const parts = ca.split('::');
+    if (parts.length >= 3) {
+      const symbol = parts[parts.length - 1].toUpperCase();
+      return symbol;
+    }
+    // If format doesn't match, return 'TOKEN' as fallback
+    return 'TOKEN';
+  } catch (error) {
+    logger.warn('Failed to extract token symbol from CA:', ca);
+    return 'TOKEN';
+  }
+}
+
 // UI Mode: Interactive wizard with buttons
 export async function handleCreateRaffleUI(msg: TelegramBot.Message): Promise<void> {
   const chatId = msg.chat.id;
@@ -373,8 +391,12 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
     data,
   });
 
-  // Create prize type selection keyboard
-  const prizeButtons = PRIZE_TYPES.map(type => ({
+  // Extract token symbol from contract address
+  const extractedToken = extractTokenSymbolFromCA(data.contractAddress);
+  
+  // Create prize type selection keyboard with extracted token, USDC, and SUI
+  const prizeTypes = [extractedToken, 'USDC', 'SUI'];
+  const prizeButtons = prizeTypes.map(type => ({
     text: type,
     callback_data: `select_prize_type_${type}`,
   }));
@@ -1074,10 +1096,15 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
-      const prizeButtons = PRIZE_TYPES.map(type => ({
+      
+      // Extract token symbol from contract address
+      const extractedToken = extractTokenSymbolFromCA(conversation.data.contractAddress);
+      const prizeTypes = [extractedToken, 'USDC', 'SUI'];
+      const prizeButtons = prizeTypes.map(type => ({
         text: type,
         callback_data: `select_prize_type_${type}`,
       }));
+      
       await bot.editMessageText(
         `✅ End Time: ${new Date(conversation.data.endTime).toLocaleString('en-US', {
           weekday: 'short',
