@@ -611,11 +611,36 @@ async function handleAnnouncementMediaStep(msg: TelegramBot.Message, data: Recor
   else if (msg.document) {
     const mimeType = msg.document.mime_type;
     if (mimeType?.startsWith('image/')) {
-      mediaFileId = msg.document.file_id;
-      mediaType = MEDIA_TYPES.IMAGE; // Still use 'image' - sendPhoto works with document file_ids
+      // For image documents, re-send as photo to get proper photo file_id
+      try {
+        const sentMsg = await bot.sendPhoto(chatId, msg.document.file_id);
+        if (sentMsg.photo && sentMsg.photo.length > 0) {
+          const largestPhoto = sentMsg.photo[sentMsg.photo.length - 1];
+          mediaFileId = largestPhoto.file_id;
+          mediaType = MEDIA_TYPES.IMAGE;
+          // Delete the re-sent message
+          await bot.deleteMessage(chatId, sentMsg.message_id);
+        }
+      } catch (error) {
+        logger.warn('Failed to convert document to photo, using document file_id', error);
+        mediaFileId = msg.document.file_id;
+        mediaType = MEDIA_TYPES.IMAGE;
+      }
     } else if (mimeType?.startsWith('video/')) {
-      mediaFileId = msg.document.file_id;
-      mediaType = MEDIA_TYPES.VIDEO; // Still use 'video' - sendVideo works with document file_ids
+      // For video documents, re-send as video to get proper video file_id
+      try {
+        const sentMsg = await bot.sendVideo(chatId, msg.document.file_id);
+        if (sentMsg.video) {
+          mediaFileId = sentMsg.video.file_id;
+          mediaType = MEDIA_TYPES.VIDEO;
+          // Delete the re-sent message
+          await bot.deleteMessage(chatId, sentMsg.message_id);
+        }
+      } catch (error) {
+        logger.warn('Failed to convert document to video, using document file_id', error);
+        mediaFileId = msg.document.file_id;
+        mediaType = MEDIA_TYPES.VIDEO;
+      }
     } else {
       await bot.sendMessage(
         chatId,
@@ -689,11 +714,36 @@ async function handleNotificationMediaStep(msg: TelegramBot.Message, data: Recor
   else if (msg.document) {
     const mimeType = msg.document.mime_type;
     if (mimeType?.startsWith('image/')) {
-      mediaFileId = msg.document.file_id;
-      mediaType = MEDIA_TYPES.IMAGE; // Still use 'image' - sendPhoto works with document file_ids
+      // For image documents, re-send as photo to get proper photo file_id
+      try {
+        const sentMsg = await bot.sendPhoto(chatId, msg.document.file_id);
+        if (sentMsg.photo && sentMsg.photo.length > 0) {
+          const largestPhoto = sentMsg.photo[sentMsg.photo.length - 1];
+          mediaFileId = largestPhoto.file_id;
+          mediaType = MEDIA_TYPES.IMAGE;
+          // Delete the re-sent message
+          await bot.deleteMessage(chatId, sentMsg.message_id);
+        }
+      } catch (error) {
+        logger.warn('Failed to convert document to photo, using document file_id', error);
+        mediaFileId = msg.document.file_id;
+        mediaType = MEDIA_TYPES.IMAGE;
+      }
     } else if (mimeType?.startsWith('video/')) {
-      mediaFileId = msg.document.file_id;
-      mediaType = MEDIA_TYPES.VIDEO; // Still use 'video' - sendVideo works with document file_ids
+      // For video documents, re-send as video to get proper video file_id
+      try {
+        const sentMsg = await bot.sendVideo(chatId, msg.document.file_id);
+        if (sentMsg.video) {
+          mediaFileId = sentMsg.video.file_id;
+          mediaType = MEDIA_TYPES.VIDEO;
+          // Delete the re-sent message
+          await bot.deleteMessage(chatId, sentMsg.message_id);
+        }
+      } catch (error) {
+        logger.warn('Failed to convert document to video, using document file_id', error);
+        mediaFileId = msg.document.file_id;
+        mediaType = MEDIA_TYPES.VIDEO;
+      }
     } else {
       await bot.sendMessage(
         chatId,
@@ -767,11 +817,36 @@ async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record
   else if (msg.document) {
     const mimeType = msg.document.mime_type;
     if (mimeType?.startsWith('image/')) {
-      mediaFileId = msg.document.file_id;
-      mediaType = MEDIA_TYPES.IMAGE; // Still use 'image' - sendPhoto works with document file_ids
+      // For image documents, re-send as photo to get proper photo file_id
+      try {
+        const sentMsg = await bot.sendPhoto(chatId, msg.document.file_id);
+        if (sentMsg.photo && sentMsg.photo.length > 0) {
+          const largestPhoto = sentMsg.photo[sentMsg.photo.length - 1];
+          mediaFileId = largestPhoto.file_id;
+          mediaType = MEDIA_TYPES.IMAGE;
+          // Delete the re-sent message
+          await bot.deleteMessage(chatId, sentMsg.message_id);
+        }
+      } catch (error) {
+        logger.warn('Failed to convert document to photo, using document file_id', error);
+        mediaFileId = msg.document.file_id;
+        mediaType = MEDIA_TYPES.IMAGE;
+      }
     } else if (mimeType?.startsWith('video/')) {
-      mediaFileId = msg.document.file_id;
-      mediaType = MEDIA_TYPES.VIDEO; // Still use 'video' - sendVideo works with document file_ids
+      // For video documents, re-send as video to get proper video file_id
+      try {
+        const sentMsg = await bot.sendVideo(chatId, msg.document.file_id);
+        if (sentMsg.video) {
+          mediaFileId = sentMsg.video.file_id;
+          mediaType = MEDIA_TYPES.VIDEO;
+          // Delete the re-sent message
+          await bot.deleteMessage(chatId, sentMsg.message_id);
+        }
+      } catch (error) {
+        logger.warn('Failed to convert document to video, using document file_id', error);
+        mediaFileId = msg.document.file_id;
+        mediaType = MEDIA_TYPES.VIDEO;
+      }
     } else {
       await bot.sendMessage(
         chatId,
