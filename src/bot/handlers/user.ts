@@ -85,7 +85,29 @@ export async function handleLeaderboardCommand(msg: TelegramBot.Message): Promis
       leaderboardMessage += `${medal} ${ticket.walletAddress.slice(0, 8)}...${ticket.walletAddress.slice(-6)} - ${ticket.ticketCount.toLocaleString()} tickets\n`;
     });
 
-      await bot.sendMessage(chatId, leaderboardMessage, { parse_mode: 'Markdown' });
+      // Send with leaderboard media if available
+      if (activeRaffle.leaderboardMediaUrl && activeRaffle.leaderboardMediaType) {
+        if (activeRaffle.leaderboardMediaType === 'image') {
+          await bot.sendPhoto(chatId, activeRaffle.leaderboardMediaUrl, {
+            caption: leaderboardMessage,
+            parse_mode: 'Markdown',
+          });
+        } else if (activeRaffle.leaderboardMediaType === 'video') {
+          await bot.sendVideo(chatId, activeRaffle.leaderboardMediaUrl, {
+            caption: leaderboardMessage,
+            parse_mode: 'Markdown',
+          });
+        } else if (activeRaffle.leaderboardMediaType === 'gif') {
+          await bot.sendAnimation(chatId, activeRaffle.leaderboardMediaUrl, {
+            caption: leaderboardMessage,
+            parse_mode: 'Markdown',
+          });
+        } else {
+          await bot.sendMessage(chatId, leaderboardMessage, { parse_mode: 'Markdown' });
+        }
+      } else {
+        await bot.sendMessage(chatId, leaderboardMessage, { parse_mode: 'Markdown' });
+      }
     } catch (error) {
       logger.error('Error fetching leaderboard:', error);
       await bot.sendMessage(chatId, '❌ Error fetching leaderboard. Please try again.');

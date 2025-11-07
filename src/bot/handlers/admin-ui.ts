@@ -612,10 +612,10 @@ async function handleAnnouncementMediaStep(msg: TelegramBot.Message, data: Recor
     const mimeType = msg.document.mime_type;
     if (mimeType?.startsWith('image/')) {
       mediaFileId = msg.document.file_id;
-      mediaType = 'document'; // Use 'document' type to send with sendDocument()
+      mediaType = MEDIA_TYPES.IMAGE; // Still use 'image' - sendPhoto works with document file_ids
     } else if (mimeType?.startsWith('video/')) {
       mediaFileId = msg.document.file_id;
-      mediaType = 'document'; // Use 'document' type to send with sendDocument()
+      mediaType = MEDIA_TYPES.VIDEO; // Still use 'video' - sendVideo works with document file_ids
     } else {
       await bot.sendMessage(
         chatId,
@@ -690,10 +690,10 @@ async function handleNotificationMediaStep(msg: TelegramBot.Message, data: Recor
     const mimeType = msg.document.mime_type;
     if (mimeType?.startsWith('image/')) {
       mediaFileId = msg.document.file_id;
-      mediaType = 'document'; // Use 'document' type to send with sendDocument()
+      mediaType = MEDIA_TYPES.IMAGE; // Still use 'image' - sendPhoto works with document file_ids
     } else if (mimeType?.startsWith('video/')) {
       mediaFileId = msg.document.file_id;
-      mediaType = 'document'; // Use 'document' type to send with sendDocument()
+      mediaType = MEDIA_TYPES.VIDEO; // Still use 'video' - sendVideo works with document file_ids
     } else {
       await bot.sendMessage(
         chatId,
@@ -768,10 +768,10 @@ async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record
     const mimeType = msg.document.mime_type;
     if (mimeType?.startsWith('image/')) {
       mediaFileId = msg.document.file_id;
-      mediaType = 'document'; // Use 'document' type to send with sendDocument()
+      mediaType = MEDIA_TYPES.IMAGE; // Still use 'image' - sendPhoto works with document file_ids
     } else if (mimeType?.startsWith('video/')) {
       mediaFileId = msg.document.file_id;
-      mediaType = 'document'; // Use 'document' type to send with sendDocument()
+      mediaType = MEDIA_TYPES.VIDEO; // Still use 'video' - sendVideo works with document file_ids
     } else {
       await bot.sendMessage(
         chatId,
@@ -1580,12 +1580,6 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
             });
           } else if (raffle.announcementMediaType === 'gif') {
             await bot.sendAnimation(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
-              caption: announcementMessage,
-              parse_mode: 'Markdown',
-            });
-          } else if (raffle.announcementMediaType === 'document') {
-            // For files sent as documents (uncompressed)
-            await bot.sendDocument(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
               caption: announcementMessage,
               parse_mode: 'Markdown',
             });
