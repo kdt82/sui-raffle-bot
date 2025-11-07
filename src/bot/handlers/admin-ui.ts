@@ -1634,19 +1634,16 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
           `📝 **Contract Address:**\n\`${raffle.ca}\`${minimumPurchaseText}\n\n` +
           `🎟️ **Ticket Allocation:**\n${ticketExplanation}\n\n` +
           `🔗 **How to Enter:**\n` +
-          `1. Link your wallet using /linkwallet <your_wallet_address>\n` +
-          `2. Purchase tokens during the raffle period\n` +
-          `3. Tickets are automatically allocated based on your purchases\n\n` +
-          `📱 **Available Commands:**\n\n` +
-          `/linkwallet <address> - Link your wallet to start earning tickets. Example: /linkwallet 0x1234...\n\n` +
-          `/walletstatus - View your currently linked wallet address\n\n` +
-          `/leaderboard - Check current raffle standings and top ticket holders\n\n` +
-          `/unlinkwallet - Remove your current wallet link (use this to change wallets)\n\n` +
-          `⚠️ **IMPORTANT DISCLAIMER:**\n` +
-          `• You MUST link your wallet to receive raffle tickets\n` +
-          `• Only purchases made DURING the raffle period count\n` +
-          `• Purchases made WITHOUT a linked wallet are NOT eligible for tickets\n` +
-          `• You only need to link your wallet once - it stays linked for all future raffles\n\n` +
+          `1. Link your wallet: /linkwallet <address>\n` +
+          `2. Purchase tokens during raffle period\n` +
+          `3. Tickets allocated automatically\n\n` +
+          `📱 **Commands:**\n` +
+          `/linkwallet - Link wallet\n` +
+          `/walletstatus - View linked wallet\n` +
+          `/leaderboard - See standings\n` +
+          `/unlinkwallet - Change wallet\n\n` +
+          `⚠️ **Must link wallet before buying to earn tickets!**\n` +
+          `Only purchases during raffle period count.\n\n` +
           `Good luck! 🍀`;
 
         // Send with media if available
