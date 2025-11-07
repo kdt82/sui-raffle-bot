@@ -166,6 +166,9 @@ export async function handleCreateRaffleStep(
     case 'create_raffle_minimum_purchase':
       await handleMinimumPurchaseStep(msg, data);
       break;
+    case 'create_raffle_media':
+      await handleMediaStep(msg, data);
+      break;
     case 'create_raffle_review':
       await handleReviewStep(msg, data);
       break;
@@ -479,7 +482,7 @@ async function handleTicketRatioStep(msg: TelegramBot.Message, data: Record<stri
   await bot.sendMessage(
     chatId,
     `✅ Ticket Ratio: ${ratioExplanation}\n\n` +
-    `Step 7/7: Minimum Purchase (Optional)\n\n` +
+    `Step 7/8: Minimum Purchase (Optional)\n\n` +
     `Set a minimum token purchase amount to earn tickets.\n` +
     `Purchases below this amount will not earn tickets.\n\n` +
     `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -503,6 +506,66 @@ async function handleMinimumPurchaseStep(msg: TelegramBot.Message, data: Record<
 
   data.minimumPurchase = minimumPurchase;
   conversationManager.updateConversation(userId, chatId, {
+    step: 'create_raffle_media',
+    data,
+  });
+
+  const keyboard: TelegramBot.InlineKeyboardMarkup = {
+    inline_keyboard: [
+      [{ text: '⏭️ Skip Media', callback_data: 'skip_media' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_minimum_purchase' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+    ],
+  };
+
+  await bot.sendMessage(
+    chatId,
+    `✅ Minimum Purchase: ${minimumPurchase} tokens\n\n` +
+    `Step 8/8: Media Upload (Optional)\n\n` +
+    `📸 Send an image, video, or GIF for your raffle announcement.\n\n` +
+    `This media will be shown when users view the raffle details.\n\n` +
+    `Or click "Skip Media" to continue without media.`,
+    {
+      reply_markup: keyboard,
+    }
+  );
+}
+
+async function handleMediaStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
+  
+  let mediaFileId: string | undefined;
+  let mediaType: string | undefined;
+
+  // Check for photo
+  if (msg.photo && msg.photo.length > 0) {
+    const largestPhoto = msg.photo[msg.photo.length - 1];
+    mediaFileId = largestPhoto.file_id;
+    mediaType = MEDIA_TYPES.IMAGE;
+  }
+  // Check for video
+  else if (msg.video) {
+    mediaFileId = msg.video.file_id;
+    mediaType = MEDIA_TYPES.VIDEO;
+  }
+  // Check for animation (GIF)
+  else if (msg.animation) {
+    mediaFileId = msg.animation.file_id;
+    mediaType = MEDIA_TYPES.GIF;
+  }
+  else {
+    await bot.sendMessage(
+      chatId,
+      '❌ Please send a valid image, video, or GIF.\n\n' +
+      'Or click "Skip Media" to continue without media.'
+    );
+    return;
+  }
+
+  data.mediaUrl = mediaFileId;
+  data.mediaType = mediaType;
+  
+  conversationManager.updateConversation(userId, chatId, {
     step: 'create_raffle_review',
     data,
   });
@@ -518,7 +581,7 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
       [{ text: '✅ Confirm & Create', callback_data: 'confirm_create_raffle' }],
-      [{ text: '🔙 Back', callback_data: 'back_to_minimum_purchase' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
   };
 
@@ -538,15 +601,19 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
   const minimumText = data.minimumPurchase 
     ? `\nMinimum Purchase: ${data.minimumPurchase} tokens` 
     : '\nMinimum Purchase: None';
+    
+  const mediaText = data.mediaUrl && data.mediaType
+    ? `\nMedia: ${data.mediaType} attached`
+    : '\nMedia: None';
 
   await bot.sendMessage(
     chatId,
     `📋 **Review Raffle Details**\n\n` +
     `Contract Address: \`${data.contractAddress}\`\n` +
-    `Data: ${dexDisplay}\n` +
+    `DEX: ${dexDisplay}\n` +
     `Prize Type: ${data.prizeType}\n` +
     `Prize Amount: ${data.prizeAmount}\n` +
-    `Ticket Ratio: ${ratioDisplay}${minimumText}\n\n` +
+    `Ticket Ratio: ${ratioDisplay}${minimumText}${mediaText}\n\n` +
     `Please review and confirm:`,
     {
       parse_mode: 'Markdown',
@@ -554,7 +621,6 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     }
   );
 }
-
 // Callback query handlers
 export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuery): Promise<void> {
   const chatId = query.message!.chat.id;
@@ -654,7 +720,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.answerCallbackQuery(query.id, { text: 'Set to 100 tickets per token' });
       await bot.editMessageText(
         `✅ Ticket Ratio: 100 tickets per token\n\n` +
-        `Step 7/7: Minimum Purchase (Optional)\n\n` +
+        `Step 7/8: Minimum Purchase (Optional)\n\n` +
         `Set a minimum token purchase amount to earn tickets.\n` +
         `Purchases below this amount will not earn tickets.\n\n` +
         `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -678,10 +744,38 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
     if (callbackData === 'skip_minimum_purchase') {
       conversation.data.minimumPurchase = null;
       conversationManager.updateConversation(userId, chatId, {
-        step: 'create_raffle_review',
+        step: 'create_raffle_media',
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id, { text: 'Skipped minimum purchase' });
+      await bot.editMessageText(
+        `✅ Minimum Purchase: None\n\n` +
+        `Step 8/8: Media Upload (Optional)\n\n` +
+        `📸 Send an image, video, or GIF for your raffle announcement.\n\n` +
+        `This media will be shown when users view the raffle details.\n\n` +
+        `Or click "Skip Media" to continue without media.`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏭️ Skip Media', callback_data: 'skip_media' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_minimum_purchase' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'skip_media') {
+      conversation.data.mediaUrl = null;
+      conversation.data.mediaType = null;
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_review',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: 'Skipped media upload' });
       await showReviewStep(chatId, conversation.data);
       return;
     }
@@ -891,7 +985,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       
       await bot.editMessageText(
         `✅ Ticket Ratio: ${ratioDisplay}\n\n` +
-        `Step 7/7: Minimum Purchase (Optional)\n\n` +
+        `Step 7/8: Minimum Purchase (Optional)\n\n` +
         `Set a minimum token purchase amount to earn tickets.\n` +
         `Purchases below this amount will not earn tickets.\n\n` +
         `⚠️ **Important:** Enter amount in **token units** (not raw units)\n` +
@@ -905,6 +999,37 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
             inline_keyboard: [
               [{ text: '⏭️ Skip (No Minimum)', callback_data: 'skip_minimum_purchase' }],
               [{ text: '🔙 Back', callback_data: 'back_to_ticket_ratio' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'back_to_media') {
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_media',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id);
+      
+      const minimumText = conversation.data.minimumPurchase
+        ? `${conversation.data.minimumPurchase} tokens`
+        : 'None';
+      
+      await bot.editMessageText(
+        `✅ Minimum Purchase: ${minimumText}\n\n` +
+        `Step 8/8: Media Upload (Optional)\n\n` +
+        `📸 Send an image, video, or GIF for your raffle announcement.\n\n` +
+        `This media will be shown when users view the raffle details.\n\n` +
+        `Or click "Skip Media" to continue without media.`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏭️ Skip Media', callback_data: 'skip_media' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_minimum_purchase' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
             ],
           },
         }
@@ -929,6 +1054,8 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         prizeAmount: data.prizeAmount,
         ticketsPerToken: data.ticketsPerToken || '100',
         minimumPurchase: data.minimumPurchase || null,
+        mediaUrl: data.mediaUrl || null,
+        mediaType: data.mediaType || null,
         status: RAFFLE_STATUS.ACTIVE,
       },
     });

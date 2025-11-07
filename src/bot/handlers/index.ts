@@ -82,6 +82,7 @@ export function registerAdminHandlers(): void {
           callbackData === 'start_now' ||
           callbackData === 'ratio_default' ||
           callbackData === 'skip_minimum_purchase' ||
+          callbackData === 'skip_media' ||
           callbackData.startsWith('back_to_')) {
         await withCallbackRateLimit(query, 'callback_ui', async () => {
           await requireAdminPrivateCallback(query, async () => {
