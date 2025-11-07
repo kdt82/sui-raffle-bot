@@ -7,6 +7,7 @@ import { handleNotificationsCommand, handleNotificationsToggle, handleNotificati
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
 import { handleBackupCommand, handleBackupListCommand, handleBackupDownloadCommand, handleBackupRestoreCommand, handleBackupRaffleCommand, handleBackupCleanupCommand } from './backup';
 import { handleAuditLogsCommand, handleAuditLogsRaffleCommand, handleAuditFailuresCommand } from './audit';
+import { handleAdminHelpCommand, handleWalletListCommand } from './help';
 import { requireAdmin, requireAdminCallback, requireAdminPrivate, requireAdminPrivateCallback } from '../middleware';
 import { conversationManager } from '../conversation';
 import { withCallbackRateLimit } from '../rate-limit-middleware';
@@ -385,6 +386,27 @@ export function registerAdminHandlers(): void {
         await handleAuditFailuresCommand(msg);
       } catch (error) {
         logger.error('Error handling /auditfailures command:', error);
+      }
+    });
+  });
+
+  // Help and utility commands
+  bot.onText(/\/adminhelp/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleAdminHelpCommand(msg);
+      } catch (error) {
+        logger.error('Error handling /adminhelp command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/walletlist/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleWalletListCommand(msg);
+      } catch (error) {
+        logger.error('Error handling /walletlist command:', error);
       }
     });
   });
