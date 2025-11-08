@@ -1048,6 +1048,12 @@ export class BuyDetector {
 
   private async broadcastBuyNotification(buyEvent: any, data: BuyEventData): Promise<void> {
     try {
+      // Only broadcast if tickets were actually earned (meets minimum purchase)
+      if (buyEvent.ticketCount === 0) {
+        logger.debug(`No tickets earned for this purchase, skipping broadcast notification`);
+        return;
+      }
+
       const broadcastChannelId = process.env.BROADCAST_CHANNEL_ID;
       if (!broadcastChannelId) {
         logger.debug('No BROADCAST_CHANNEL_ID configured, skipping broadcast');
