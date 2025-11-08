@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger';
 import { withRateLimit } from '../rate-limit-middleware';
 import { RATE_LIMITS } from '../../utils/rate-limiter';
 import { incrementCommand } from '../../utils/metrics';
+import { formatDateShort } from '../../utils/constants';
 
 /**
  * View recent audit logs
@@ -28,13 +29,7 @@ export async function handleAuditLogsCommand(msg: TelegramBot.Message): Promise<
       let message = '📋 *Recent Audit Logs* (Last 20)\n\n';
 
       for (const log of logs) {
-        const timestamp = new Date(log.timestamp).toLocaleString('en-US', {
-          month: 'short',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'UTC',
-        });
+        const timestamp = formatDateShort(new Date(log.timestamp));
 
         const performer = log.performedBy
           ? `@${log.performedByUsername || log.performedBy.toString()}`
@@ -104,13 +99,7 @@ export async function handleAuditLogsRaffleCommand(msg: TelegramBot.Message): Pr
       let message = `📋 *Audit Logs for Raffle*\n\`${raffleId}\`\n\n`;
 
       for (const log of logs) {
-        const timestamp = new Date(log.timestamp).toLocaleString('en-US', {
-          month: 'short',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'UTC',
-        });
+        const timestamp = formatDateShort(new Date(log.timestamp));
 
         const performer = log.performedBy
           ? `@${log.performedByUsername || log.performedBy.toString()}`
@@ -170,13 +159,7 @@ export async function handleAuditFailuresCommand(msg: TelegramBot.Message): Prom
 
       for (const log of logs.slice(0, 15)) {
         // Show max 15
-        const timestamp = new Date(log.timestamp).toLocaleString('en-US', {
-          month: 'short',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'UTC',
-        });
+        const timestamp = formatDateShort(new Date(log.timestamp));
 
         message += `❌ ${timestamp} - \`${log.action}\`\n`;
 

@@ -5,6 +5,7 @@ import { withRateLimit } from '../rate-limit-middleware';
 import { RATE_LIMITS } from '../../utils/rate-limiter';
 import { incrementCommand } from '../../utils/metrics';
 import { prisma } from '../../utils/database';
+import { formatDateShort } from '../../utils/constants';
 
 /**
  * Admin command reference - Lists all available commands with usage
@@ -127,14 +128,7 @@ export async function handleWalletListCommand(msg: TelegramBot.Message): Promise
           const num = i + chunk.indexOf(wu) + 1;
           const shortWallet = `${wu.walletAddress.slice(0, 8)}...${wu.walletAddress.slice(-6)}`;
           const username = wu.telegramUsername ? `@${wu.telegramUsername}` : `ID: ${wu.telegramUserId}`;
-          const linkedDate = wu.linkedAt.toLocaleString('en-US', {
-            month: 'short',
-            day: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: 'UTC',
-          });
+          const linkedDate = formatDateShort(wu.linkedAt);
 
           chunkMessage += `${num}. ${username}\n`;
           chunkMessage += `   Wallet: ${wu.walletAddress}\n`;

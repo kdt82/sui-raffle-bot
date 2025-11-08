@@ -1,6 +1,6 @@
 import { prisma } from '../utils/database';
 import { logger } from '../utils/logger';
-import { RAFFLE_STATUS } from '../utils/constants';
+import { RAFFLE_STATUS, formatDate } from '../utils/constants';
 import { selectWinner } from './winner-service';
 import { notificationService } from './notification-service';
 import { trackRaffleEvent } from '../utils/metrics';
@@ -57,15 +57,7 @@ async function sendRaffleStartAnnouncement(raffle: any): Promise<void> {
     const startMessage =
       `🚀 **RAFFLE HAS STARTED!** 🚀\n\n` +
       `💰 **Prize:** ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
-      `⏰ **Active Now Until:** ${raffle.endTime.toLocaleString('en-US', {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'UTC'
-      })} UTC\n\n` +
+      `⏰ **Active Now Until:** ${formatDate(raffle.endTime)} UTC\n\n` +
       `📝 **Contract Address:**\n\`${raffle.ca}\`${minimumPurchaseText}\n\n` +
       `🎟️ **Ticket Allocation:**\n${ticketExplanation}\n\n` +
       `🔗 **Quick Start:**\n` +

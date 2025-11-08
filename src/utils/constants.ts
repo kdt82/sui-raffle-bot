@@ -28,6 +28,48 @@ export const ADMIN_PERMISSIONS = {
   SUPER_ADMIN: 'super_admin',
 } as const;
 
+/**
+ * Format date consistently across the application
+ * Returns format: "1st November 2025, 12:00 PM"
+ */
+export function formatDate(date: Date): string {
+  const day = date.getUTCDate();
+  const suffix = getDaySuffix(day);
+  const month = date.toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
+  const year = date.getUTCFullYear();
+  const time = date.toLocaleString('en-GB', { 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    hour12: true,
+    timeZone: 'UTC' 
+  });
+  
+  return `${day}${suffix} ${month} ${year}, ${time}`;
+}
+
+/**
+ * Format date as DD/MM/YYYY HH:MM
+ */
+export function formatDateShort(date: Date): string {
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+function getDaySuffix(day: number): string {
+  if (day > 3 && day < 21) return 'th';
+  switch (day % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
+}
+
 export const MEDIA_TYPES = {
   IMAGE: 'image',
   VIDEO: 'video',

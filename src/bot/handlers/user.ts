@@ -2,7 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
 import { prisma } from '../../utils/database';
 import { logger } from '../../utils/logger';
-import { RAFFLE_STATUS } from '../../utils/constants';
+import { RAFFLE_STATUS, formatDate } from '../../utils/constants';
 import { withRateLimit } from '../rate-limit-middleware';
 import { RATE_LIMITS } from '../../utils/rate-limiter';
 import { incrementCommand } from '../../utils/metrics';
@@ -80,7 +80,7 @@ export async function handleLeaderboardCommand(msg: TelegramBot.Message): Promis
     }
 
     let leaderboardMessage = '🏆 **Leaderboard**\n\n';
-    leaderboardMessage += `Raffle ends: ${activeRaffle.endTime.toLocaleString()}\n\n`;
+    leaderboardMessage += `Raffle ends: ${formatDate(activeRaffle.endTime)} UTC\n\n`;
 
     topTickets.forEach((ticket, index) => {
       const rank = index + 1;
@@ -186,7 +186,7 @@ export async function handleMyTicketsCommand(msg: TelegramBot.Message): Promise<
     });
 
     const ticketCount = ticket?.ticketCount || 0;
-    const message = `🎫 Your Tickets\n\nWallet: ${walletUser.walletAddress}\nTickets: ${ticketCount.toLocaleString()}\n\nRaffle ends: ${activeRaffle.endTime.toLocaleString()}`;
+    const message = `🎫 Your Tickets\n\nWallet: ${walletUser.walletAddress}\nTickets: ${ticketCount.toLocaleString()}\n\nRaffle ends: ${formatDate(activeRaffle.endTime)} UTC`;
 
       await bot.sendMessage(chatId, message);
     } catch (error) {
@@ -288,15 +288,7 @@ export async function handleWalletStatusCommand(msg: TelegramBot.Message): Promi
       }
 
       const shortWallet = `${walletUser.walletAddress.slice(0, 8)}...${walletUser.walletAddress.slice(-6)}`;
-      const linkedDate = walletUser.linkedAt?.toLocaleString('en-US', {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'UTC'
-      }) || 'Unknown';
+      const linkedDate = walletUser.linkedAt ? formatDate(walletUser.linkedAt) : 'Unknown';
 
       await bot.sendMessage(
         chatId,

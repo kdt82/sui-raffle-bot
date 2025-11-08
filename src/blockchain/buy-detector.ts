@@ -4,7 +4,7 @@ import { getSuiClient } from './sui-client';
 import { getBlockberryClient, BlockberryRawTrade } from './blockberry-client';
 import { prisma } from '../utils/database';
 import { logger } from '../utils/logger';
-import { RAFFLE_STATUS, DEFAULT_TICKETS_PER_TOKEN } from '../utils/constants';
+import { RAFFLE_STATUS, DEFAULT_TICKETS_PER_TOKEN, formatDate } from '../utils/constants';
 import { getRedisClient } from '../utils/redis';
 import { bot } from '../bot';
 
@@ -1084,7 +1084,7 @@ export class BuyDetector {
         `🔗 Source: \`On-chain\`\n\n` +
         `🏆 Prize Pool: \`${raffle.prizeAmount} ${raffle.prizeType}\`\n` +
         `${countdown}\n` +
-        `📅 Ends: ${raffle.endTime.toLocaleString('en-US', { timeZone: 'UTC' })} UTC${minimumText}\n\n` +
+        `📅 Ends: ${formatDate(raffle.endTime)} UTC${minimumText}\n\n` +
         `_Every 1 token purchased = ${ticketsPerTokenRatio} raffle tickets!_`;
 
       // Use notification media if available, otherwise fall back to old media fields

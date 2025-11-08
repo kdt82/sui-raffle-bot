@@ -2,7 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
 import { prisma } from '../../utils/database';
 import { logger } from '../../utils/logger';
-import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX, getDexDisplayName, DexType, MAIN_CHAT_ID } from '../../utils/constants';
+import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX, getDexDisplayName, DexType, MAIN_CHAT_ID, formatDateShort, formatDate } from '../../utils/constants';
 import { conversationManager } from '../conversation';
 import { auditService } from '../../services/audit-service';
 
@@ -149,7 +149,7 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
       `Raffle ID: ${raffle.id}\n` +
       `Contract Address: ${ca}\n` +
       `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
-      `Ends: ${endTime.toLocaleString()}\n` +
+      `Ends: ${formatDate(endTime)} UTC\n` +
       `Prize: ${prizeAmount} ${prizeType}`
     );
   } catch (error) {
@@ -230,15 +230,7 @@ async function handleContractAddressStep(msg: TelegramBot.Message, data: Record<
 
   // Get current UTC time (to nearest minute)
   const now = new Date();
-  const currentUtc = now.toLocaleString('en-US', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-    hour12: false
-  });
+  const currentUtc = formatDateShort(now);
 
   await bot.sendMessage(
     chatId,
@@ -318,29 +310,11 @@ async function handleStartTimeStep(msg: TelegramBot.Message, data: Record<string
 
   // Get current UTC time (to nearest minute)
   const now = new Date();
-  const currentUtc = now.toLocaleString('en-US', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-    hour12: false
-  });
+  const currentUtc = formatDateShort(now);
 
   await bot.sendMessage(
     chatId,
-    `✅ Start Time: ${startTime.toLocaleString('en-US', { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric', 
-      hour: '2-digit', 
-      minute: '2-digit',
-      second: '2-digit',
-      timeZone: 'UTC',
-      timeZoneName: 'short'
-    })}\n\n` +
+    `✅ Start Time: ${formatDate(startTime)} UTC\n\n` +
     `Step 3/11: End Time\n\n` +
     `🕐 Current UTC Time: \`${currentUtc}\`\n\n` +
     `Please send the raffle end time in format: DD/MM/YYYY HH:mm:ss (UTC)\n\n` +
@@ -405,14 +379,14 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
     await bot.sendMessage(
       chatId, 
       `❌ End time must be after start time.\n\n` +
-      `Start time: ${startTime.toLocaleString()} UTC\n` +
-      `Your end time: ${endTime.toLocaleString()} UTC`
+      `Start time: ${formatDate(startTime)} UTC\n` +
+      `Your end time: ${formatDate(endTime)} UTC`
     );
     return;
   }
 
   if (endTime <= new Date()) {
-    await bot.sendMessage(chatId, `❌ End time must be in the future.\n\nCurrent time: ${new Date().toISOString()}\nYour time: ${endTime.toISOString()}`);
+    await bot.sendMessage(chatId, `❌ End time must be in the future.\n\nCurrent time: ${formatDate(new Date())} UTC\nYour time: ${formatDate(endTime)} UTC`);
     return;
   }
 
@@ -441,17 +415,7 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
 
   await bot.sendMessage(
     chatId,
-    `✅ End Time: ${endTime.toLocaleString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZone: 'UTC',
-      timeZoneName: 'short'
-    })}\n\n` +
+    `✅ End Time: ${formatDate(endTime)} UTC\n\n` +
     `Step 4/11: Prize Type\n\n` +
     `Select the prize type:`,
     {
@@ -1633,24 +1597,8 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         const announcementMessage =
           `🎉 **A New Raffle Has Been Scheduled!** 🎉\n\n` +
           `💰 **Prize:** ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
-          `📅 **Start:** ${raffle.startTime.toLocaleString('en-US', { 
-            weekday: 'short', 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit',
-            timeZone: 'UTC'
-          })} UTC\n` +
-          `📅 **End:** ${raffle.endTime.toLocaleString('en-US', { 
-            weekday: 'short', 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit',
-            timeZone: 'UTC'
-          })} UTC\n\n` +
+          `📅 **Start:** ${formatDate(raffle.startTime)} UTC\n` +
+          `📅 **End:** ${formatDate(raffle.endTime)} UTC\n\n` +
           `📝 **Contract Address:**\n\`${raffle.ca}\`${minimumPurchaseText}\n\n` +
           `🎟️ **Ticket Allocation:**\n${ticketExplanation}\n\n` +
           `🔗 **How to Enter:**\n` +
