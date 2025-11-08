@@ -33,9 +33,9 @@ export async function handleAdminHelpCommand(msg: TelegramBot.Message): Promise<
   • Manually add tickets to a wallet
   • Example: /add\\_tickets cm2abc123 0x123... 1000
 
-/remove\\_tickets <raffleId> <wallet> <amount>
-  • Remove tickets from a wallet
-  • Example: /remove\\_tickets cm2abc123 0x123... 500
+/remove\\_tickets <wallet> <amount>
+  • Remove tickets from a wallet (uses active raffle)
+  • Example: /remove\\_tickets 0x123... 500
 
 /reset\\_tickets <raffleId>
   • Reset all tickets for a raffle to zero
