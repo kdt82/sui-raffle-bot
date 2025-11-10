@@ -953,13 +953,23 @@ export class BuyDetector {
         '0x91bfbc386a41afcfd9b2533058d7e915a1d3829089cc268ff4333d54d6339ca1', // Turbos
         '0xa0eba10b173538c8fecca1dff298e488402cc9ff374f8a12ca7758eebe830b66', // Kriya
         '0xdee9', // DeepBook
-        '0x', // Any other package (general DEX check)
       ];
 
       // Check all transactions in the programmable transaction
+      let hasMoveCalls = false;
+      let isDexSwap = false;
+
       for (const tx of programmableTx.transactions) {
+        // Check for simple transfers (TransferObjects) - these are wallet-to-wallet
+        if ('TransferObjects' in tx) {
+          logger.debug('Transaction contains TransferObjects (likely wallet-to-wallet)', { txDigest });
+          // Don't immediately reject - there could be other calls
+          continue;
+        }
+
         // Type assertion since MoveCall isn't in the union type but exists at runtime
         if ('MoveCall' in tx) {
+          hasMoveCalls = true;
           const moveCall = (tx as any).MoveCall;
           const packageId = moveCall.package;
           
@@ -972,27 +982,42 @@ export class BuyDetector {
 
           if (isSwapFunction) {
             logger.debug('Transfer is from DEX swap', { txDigest, function: moveCall.function });
-            return true;
+            isDexSwap = true;
+            break;
           }
 
           // Also check if package is a known DEX (even without "swap" in function name)
           for (const dexPkg of dexPackages) {
             if (packageId.startsWith(dexPkg)) {
               logger.debug('Transfer is from known DEX package', { txDigest, package: packageId });
-              return true;
+              isDexSwap = true;
+              break;
             }
           }
+
+          if (isDexSwap) break;
         }
       }
 
-      // If no DEX-related calls found, it's likely a simple transfer
+      // If we found DEX swap indicators, it's a buy
+      if (isDexSwap) {
+        return true;
+      }
+
+      // If there are no MoveCall transactions, it's likely a simple transfer
+      if (!hasMoveCalls) {
+        logger.debug('No MoveCall found - simple wallet transfer detected', { txDigest });
+        return false;
+      }
+
+      // Has MoveCall but not to a DEX - likely not a swap
       logger.debug('No DEX swap detected in transaction', { txDigest });
       return false;
     } catch (error) {
       logger.error('Error checking if transfer is from DEX swap:', error);
-      // On error, assume it's a DEX swap to avoid false negatives
-      // (better to include a few extra than miss legitimate buys)
-      return true;
+      // On error, be conservative and reject the transfer
+      // This prevents wallet-to-wallet transfers from sneaking through
+      return false;
     }
   }
 
