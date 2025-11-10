@@ -5,9 +5,11 @@
 ### ✅ Core Features Implemented
 
 1. **Multi-DEX Support**
-   - Cetus, Turbos Finance, 7k.ag, DexScreener, SuiDex
-   - Factory pattern for easy DEX switching
-   - Automatic buy detection per selected DEX
+   - Cetus, Turbos Finance, Kriya, DeepBook, and more
+   - Smart transaction analysis to detect actual DEX swaps
+   - **Filters out wallet-to-wallet transfers** - only DEX buys earn tickets
+   - Automatic buy detection from on-chain events
+   - Dual monitoring: Blockberry API + native SUI events
 
 2. **Interactive Admin UI**
    - Step-by-step wizard for raffle creation
@@ -16,11 +18,14 @@
    - Dual mode: UI wizard + command-line
 
 3. **Raffle Management**
-   - Create raffles with specific DEX, token, time period, prizes
-   - Automatic ticket allocation (100 tickets per token)
-   - Configurable prize types (USDC, AQUA, SUI)
-   - Media upload support (images/videos/GIFs)
+   - Create raffles with specific token, time period, prizes
+   - Automatic ticket allocation (configurable ratio per token)
+   - Configurable prize types (USDC, AQUA, SUI, custom)
+   - Multi-media upload support (announcement, notification, leaderboard)
+   - Minimum purchase threshold support
+   - Automatic raffle start announcements
    - Automatic raffle ending and winner selection
+   - Comprehensive audit logging
 
 4. **User Features**
    - `/start` - Welcome and instructions

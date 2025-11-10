@@ -4,20 +4,22 @@ A whitelabeled Telegram bot for conducting raffles based on SUI token purchases.
 
 ## Features
 
-- 🎰 Automatic ticket allocation based on token purchases (100 tickets per token)
+- 🎰 Automatic ticket allocation based on DEX token swaps (100 tickets per token by default)
+- 🔍 Smart buy detection - only tracks actual DEX swaps, not wallet-to-wallet transfers
 - ⏰ Configurable raffle time periods
 - 📸 Media upload support (images/videos/GIFs)
 - 📊 Leaderboard display
 - 🔗 Wallet linking (auto-detect + manual)
 - 🎲 SUI randomizer-based winner selection
 - 🔐 Admin controls for raffle management
-- 🔄 Multi-DEX support (Cetus, Turbos, 7k.ag, DexScreener, SuiDex)
+- 🔄 Multi-DEX support (Cetus, Turbos, Kriya, DeepBook, and more)
 - 💬 Interactive admin UI with inline keyboards
 - 🛡️ Redis-based rate limiting and anti-spam
 - 📈 Built-in metrics and health monitoring
 - 🐳 Docker support with multi-stage builds
 - 🎲 Provably fair winner selection with SUI on-chain randomness
 - 💾 Automated backup & recovery system
+- 🎯 Minimum purchase threshold support
 
 ## Setup
 
@@ -84,9 +86,11 @@ npm run dev
 **Supported DEXes for buy detection:**
 - `cetus` - Cetus DEX
 - `turbos` - Turbos Finance
-- `7kag` - 7k.ag
-- `dexscreener` - DexScreener API
-- `suidex` - SuiDex
+- `kriya` - Kriya DEX
+- `deepbook` - DeepBook
+- And other DEXes via transaction analysis
+
+**Important:** The bot only tracks actual DEX swaps (buys/trades). Wallet-to-wallet transfers are automatically filtered out and will not earn raffle tickets.
 
 ## Architecture
 
