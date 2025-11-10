@@ -307,6 +307,17 @@ export class BuyDetector {
           continue;
         }
 
+        // Check if this transfer is from a DEX swap by inspecting the transaction
+        const txDigest = event.id?.txDigest;
+        if (txDigest) {
+          const isDexSwap = await this.isTransferFromDexSwap(client, txDigest);
+          if (!isDexSwap) {
+            logger.debug('Skipping non-DEX transfer (wallet-to-wallet)', { txDigest, recipient });
+            this.processedEventIds.add(eventKey);
+            continue;
+          }
+        }
+
         const decimals = await this.getCoinDecimals(client, coinType);
         const tokenAmount = this.formatAmount(amountRaw, decimals);
 
@@ -906,6 +917,83 @@ export class BuyDetector {
     }
 
     return `${txDigest}:${seq}`;
+  }
+
+  /**
+   * Check if a transfer came from a DEX swap by inspecting the transaction
+   * Returns true if the transaction contains calls to known DEX packages
+   */
+  private async isTransferFromDexSwap(client: SuiClient, txDigest: string): Promise<boolean> {
+    try {
+      const txResponse = await client.getTransactionBlock({
+        digest: txDigest,
+        options: {
+          showInput: true,
+          showEffects: true,
+        },
+      });
+
+      if (!txResponse || !txResponse.transaction) {
+        return false;
+      }
+
+      const txData = txResponse.transaction.data;
+      if (!txData || txData.transaction.kind !== 'ProgrammableTransaction') {
+        return false;
+      }
+
+      const programmableTx = txData.transaction;
+      if (!programmableTx.transactions || programmableTx.transactions.length === 0) {
+        return false;
+      }
+
+      // Known DEX package prefixes on SUI
+      const dexPackages = [
+        '0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb', // Cetus
+        '0x91bfbc386a41afcfd9b2533058d7e915a1d3829089cc268ff4333d54d6339ca1', // Turbos
+        '0xa0eba10b173538c8fecca1dff298e488402cc9ff374f8a12ca7758eebe830b66', // Kriya
+        '0xdee9', // DeepBook
+        '0x', // Any other package (general DEX check)
+      ];
+
+      // Check all transactions in the programmable transaction
+      for (const tx of programmableTx.transactions) {
+        // Type assertion since MoveCall isn't in the union type but exists at runtime
+        if ('MoveCall' in tx) {
+          const moveCall = (tx as any).MoveCall;
+          const packageId = moveCall.package;
+          
+          // Check if this is a call to a DEX package
+          // Most DEX swaps will have "swap" in the function name
+          const functionName = moveCall.function?.toLowerCase() || '';
+          const isSwapFunction = functionName.includes('swap') || 
+                                functionName.includes('trade') || 
+                                functionName.includes('exchange');
+
+          if (isSwapFunction) {
+            logger.debug('Transfer is from DEX swap', { txDigest, function: moveCall.function });
+            return true;
+          }
+
+          // Also check if package is a known DEX (even without "swap" in function name)
+          for (const dexPkg of dexPackages) {
+            if (packageId.startsWith(dexPkg)) {
+              logger.debug('Transfer is from known DEX package', { txDigest, package: packageId });
+              return true;
+            }
+          }
+        }
+      }
+
+      // If no DEX-related calls found, it's likely a simple transfer
+      logger.debug('No DEX swap detected in transaction', { txDigest });
+      return false;
+    } catch (error) {
+      logger.error('Error checking if transfer is from DEX swap:', error);
+      // On error, assume it's a DEX swap to avoid false negatives
+      // (better to include a few extra than miss legitimate buys)
+      return true;
+    }
   }
 
   private extractRecipient(data: Record<string, any>): string | null {
