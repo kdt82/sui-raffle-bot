@@ -421,6 +421,20 @@ export class BuyDetector {
           decimals = await this.getCoinDecimals(suiClient, trade.coinType);
         }
 
+        // Validate that this is actually a DEX swap, not a simple transfer
+        if (!suiClient) {
+          suiClient = getSuiClient();
+        }
+        const isDexSwap = await this.isTransferFromDexSwap(suiClient, trade.txDigest);
+        if (!isDexSwap) {
+          logger.debug('Blockberry trade is actually a wallet transfer, skipping', { 
+            txDigest: trade.txDigest, 
+            wallet: trade.walletAddress 
+          });
+          this.processedEventIds.add(trade.eventKey);
+          continue;
+        }
+
         const tokenAmount = this.formatAmount(trade.amountRaw, decimals);
 
         const buyEvent: BuyEventData = {
