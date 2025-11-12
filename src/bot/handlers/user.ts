@@ -64,20 +64,28 @@ export async function handleLeaderboardCommand(msg: TelegramBot.Message): Promis
       return;
     }
 
-    // Get top 10 tickets
+    // Get top 25 tickets
     const topTickets = await prisma.ticket.findMany({
       where: {
         raffleId: activeRaffle.id,
         ticketCount: { gt: 0 },
       },
       orderBy: { ticketCount: 'desc' },
-      take: 10,
+      take: 25,
     });
 
     if (topTickets.length === 0) {
       await bot.sendMessage(chatId, '📊 No tickets allocated yet. Buy tokens to get started!');
       return;
     }
+
+    // Get total participant count
+    const totalParticipants = await prisma.ticket.count({
+      where: {
+        raffleId: activeRaffle.id,
+        ticketCount: { gt: 0 },
+      },
+    });
 
     let leaderboardMessage = '🏆 **Leaderboard**\n\n';
     leaderboardMessage += `Raffle ends: ${formatDate(activeRaffle.endTime)} UTC\n\n`;
@@ -87,6 +95,11 @@ export async function handleLeaderboardCommand(msg: TelegramBot.Message): Promis
       const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
       leaderboardMessage += `${medal} ${ticket.walletAddress.slice(0, 8)}...${ticket.walletAddress.slice(-6)} - ${ticket.ticketCount.toLocaleString()} tickets\n`;
     });
+
+    // Add footer with total participants
+    if (totalParticipants > 25) {
+      leaderboardMessage += `\n_Showing top 25 of ${totalParticipants} participants_`;
+    }
 
       // Send with leaderboard media if available
       if (activeRaffle.leaderboardMediaUrl && activeRaffle.leaderboardMediaType) {
