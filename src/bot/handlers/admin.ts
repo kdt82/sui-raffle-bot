@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger';
 import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS, formatDate } from '../../utils/constants';
 import { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
 import { conversationManager } from '../conversation';
+import { auditService } from '../../services/audit-service';
 
 // Re-export UI handler
 export { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
@@ -346,6 +347,34 @@ export async function handleAwardPrize(msg: TelegramBot.Message): Promise<void> 
   const chatId = msg.chat.id;
 
   try {
+    // Parse command arguments: /award_prize <txhash or link>
+    const args = msg.text?.split(' ').slice(1);
+    const txInput = args?.[0];
+
+    if (!txInput) {
+      await bot.sendMessage(
+        chatId,
+        '❌ *Missing transaction hash*\n\n' +
+        '*Usage:* `/award_prize <txhash>`\n\n' +
+        '*Examples:*\n' +
+        '`/award_prize A1B2C3...`\n' +
+        '`/award_prize https://suiscan.xyz/mainnet/tx/A1B2C3...`\n\n' +
+        'Please provide the transaction hash or SuiScan link for the prize transfer.',
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
+    // Extract transaction hash from URL or use as-is
+    let txHash = txInput;
+    if (txInput.includes('suiscan.xyz') || txInput.includes('suivision.xyz') || txInput.includes('explorer.sui.io')) {
+      // Extract hash from URL
+      const match = txInput.match(/\/tx\/([A-Za-z0-9]+)/);
+      if (match) {
+        txHash = match[1];
+      }
+    }
+
     const endedRaffle = await prisma.raffle.findFirst({
       where: {
         status: { in: [RAFFLE_STATUS.ENDED, RAFFLE_STATUS.WINNER_SELECTED] },
@@ -369,32 +398,48 @@ export async function handleAwardPrize(msg: TelegramBot.Message): Promise<void> 
     const winner = endedRaffle.winners[0];
 
     if (winner.prizeAwarded) {
+      const txLink = winner.awardTxHash 
+        ? `\n🔗 [View Transaction](https://suiscan.xyz/mainnet/tx/${winner.awardTxHash})`
+        : '';
+      
       await bot.sendMessage(
         chatId,
-        `✅ Prize already awarded!\n\n` +
-        `Winner: ${winner.walletAddress}\n` +
-        `Tickets: ${winner.ticketCount}\n` +
-        `Awarded at: ${winner.awardedAt?.toLocaleString()}`
+        `✅ *Prize already awarded!*\n\n` +
+        `*Winner:* \`${winner.walletAddress}\`\n` +
+        `*Tickets:* ${winner.ticketCount.toLocaleString()}\n` +
+        `*Awarded:* ${formatDate(winner.awardedAt!)} UTC${txLink}`,
+        { parse_mode: 'Markdown' }
       );
       return;
     }
 
+    // Update winner with transaction hash
     await prisma.winner.update({
       where: { id: winner.id },
       data: {
         prizeAwarded: true,
         awardedAt: new Date(),
+        awardTxHash: txHash,
       },
     });
 
+    // Format SuiScan link
+    const suiscanLink = `https://suiscan.xyz/mainnet/tx/${txHash}`;
+
     await bot.sendMessage(
       chatId,
-      `✅ Prize marked as awarded!\n\n` +
-      `Raffle ID: ${endedRaffle.id}\n` +
-      `Winner: ${winner.walletAddress}\n` +
-      `Tickets: ${winner.ticketCount}\n` +
+      `✅ *Prize Marked as Awarded!*\n\n` +
+      `*Raffle Details:*\n` +
+      `ID: \`${endedRaffle.id}\`\n` +
       `Prize: ${endedRaffle.prizeAmount} ${endedRaffle.prizeType}\n\n` +
-      `Please send the prize to the winner's wallet address.`
+      `*Winner:*\n` +
+      `Wallet: \`${winner.walletAddress}\`\n` +
+      `Tickets: ${winner.ticketCount.toLocaleString()}\n\n` +
+      `*Transaction:*\n` +
+      `🔗 [View on SuiScan](${suiscanLink})\n` +
+      `Hash: \`${txHash}\`\n\n` +
+      `Winner will be notified with transaction details.`,
+      { parse_mode: 'Markdown', disable_web_page_preview: true }
     );
 
     // Notify winner if they have linked their wallet
@@ -406,15 +451,31 @@ export async function handleAwardPrize(msg: TelegramBot.Message): Promise<void> 
       try {
         await bot.sendMessage(
           walletUser.telegramUserId.toString(),
-          `🎉 Congratulations! You won the raffle!\n\n` +
-          `Prize: ${endedRaffle.prizeAmount} ${endedRaffle.prizeType}\n` +
-          `Your tickets: ${winner.ticketCount}\n\n` +
-          `The prize will be sent to: ${winner.walletAddress}`
+          `🎉 *Congratulations! Your Prize Has Been Sent!*\n\n` +
+          `*Prize:* ${endedRaffle.prizeAmount} ${endedRaffle.prizeType}\n` +
+          `*Your Wallet:* \`${winner.walletAddress}\`\n` +
+          `*Your Tickets:* ${winner.ticketCount.toLocaleString()}\n\n` +
+          `*Transaction Details:*\n` +
+          `🔗 [View on SuiScan](${suiscanLink})\n` +
+          `Hash: \`${txHash}\`\n\n` +
+          `Thank you for participating! 🎊`,
+          { parse_mode: 'Markdown', disable_web_page_preview: true }
         );
       } catch (error) {
         logger.warn('Could not notify winner:', error);
       }
     }
+
+    // AUDIT LOG: Prize awarded (non-blocking)
+    auditService.logPrizeAwarded(
+      BigInt(msg.from!.id),
+      msg.from!.username,
+      endedRaffle.id,
+      winner.walletAddress
+    ).catch(err =>
+      logger.error('Audit log failed (non-blocking):', err)
+    );
+
   } catch (error) {
     logger.error('Error awarding prize:', error);
     await bot.sendMessage(chatId, '❌ Error awarding prize. Please try again.');
@@ -499,6 +560,11 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       ? `\n📅 Awarded: ${formatDate(winner.awardedAt)} UTC`
       : '\n⏳ Prize not yet awarded';
 
+    // Build transaction link if available
+    const txSection = winner.awardTxHash
+      ? `\n🔗 [View Transaction](https://suiscan.xyz/mainnet/tx/${winner.awardTxHash})`
+      : '';
+
     // Build randomness proof section
     let randomnessSection = '';
     if (winner.selectionMethod === 'on-chain' && winner.randomnessEpoch) {
@@ -522,12 +588,12 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       `*Winner Details:*\n` +
       `Wallet: \`${winner.walletAddress}\`\n` +
       `Tickets: ${winner.ticketCount.toLocaleString()} (${winnerPercentage}% of total)\n` +
-      `Selected: ${formatDate(winner.selectedAt)} UTC${awardedText}${randomnessSection}\n\n` +
+      `Selected: ${formatDate(winner.selectedAt)} UTC${awardedText}${txSection}${randomnessSection}\n\n` +
       `*Raffle Stats:*\n` +
       `Total Participants: ${totalParticipants}\n` +
       `Total Tickets: ${totalTickets.toLocaleString()}\n\n` +
-      `${!winner.prizeAwarded ? '💡 Use /award_prize to mark as awarded' : ''}`,
-      { parse_mode: 'Markdown' }
+      `${!winner.prizeAwarded ? '💡 Use /award_prize <txhash> to mark as awarded' : ''}`,
+      { parse_mode: 'Markdown', disable_web_page_preview: true }
     );
 
   } catch (error) {

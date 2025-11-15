@@ -105,6 +105,7 @@ model Winner {
   selectedAt        DateTime @default(now())
   prizeAwarded      Boolean  @default(false)
   awardedAt         DateTime?
+  awardTxHash       String?  // Transaction hash/digest for prize transfer
   selectionMethod   String?  // 'on-chain' or 'client-side'
   randomnessEpoch   String?  // SUI blockchain epoch when randomness was generated
   randomnessProof   String?  // JSON proof data for verification
