@@ -539,6 +539,9 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       ? ((Number(winner.ticketCount) / totalTickets) * 100).toFixed(2)
       : '0';
 
+    // Convert BigInt to string for display
+    const ticketCountStr = winner.ticketCount.toString();
+
     const statusEmoji = winner.prizeAwarded ? '✅' : '⏳';
     const awardedText = winner.prizeAwarded && winner.awardedAt
       ? `\n📅 Awarded: ${formatDate(winner.awardedAt)} UTC`
@@ -568,12 +571,12 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       `🏆 *Raffle Winner*\n\n` +
       `${statusEmoji} *Status:* ${winner.prizeAwarded ? 'Prize Awarded' : 'Pending Award'}\n\n` +
       `*Raffle Details:*\n` +
-      `ID: \`${raffle.id}\`\n` +
+      `ID: ${raffle.id}\n` +
       `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n` +
       `Ended: ${formatDate(raffle.endTime)} UTC\n\n` +
       `*Winner Details:*\n` +
-      `Wallet: \`${winner.walletAddress}\`\n` +
-      `Tickets: ${winner.ticketCount.toLocaleString()} (${winnerPercentage}% of total)\n` +
+      `Wallet: ${winner.walletAddress}\n` +
+      `Tickets: ${ticketCountStr} (${winnerPercentage}% of total)\n` +
       `Selected: ${formatDate(winner.selectedAt)} UTC${awardedText}${txSection}${randomnessSection}\n\n` +
       `*Raffle Stats:*\n` +
       `Total Participants: ${totalParticipants}\n` +
@@ -705,15 +708,18 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
         randomnessSection = `\n*Selection Method:* ${winner.selectionMethod}\n\n`;
       }
 
+      // Convert BigInt to string for display
+      const ticketCountStr = winner.ticketCount.toString();
+
       await bot.sendMessage(
         chatId,
         `🎉 *Winner Selected!*\n\n` +
         `*Winner Details:*\n` +
-        `Wallet: \`${winner.walletAddress}\`\n` +
-        `Tickets: ${winner.ticketCount.toLocaleString()}\n` +
+        `Wallet: ${winner.walletAddress}\n` +
+        `Tickets: ${ticketCountStr}\n` +
         randomnessSection +
         `*Raffle Details:*\n` +
-        `ID: \`${raffle.id}\`\n` +
+        `ID: ${raffle.id}\n` +
         `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
         `The winner has been announced in the broadcast channel.\n\n` +
         `Use /award_prize <txhash> to mark the prize as awarded.`,

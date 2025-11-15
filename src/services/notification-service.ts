@@ -230,13 +230,16 @@ Check your tickets: /mytickets
         randomnessSection = `\n🔐 *Selection Method:* Weighted Random\n`;
       }
 
+      // Convert BigInt to string for display
+      const ticketCountStr = winner.ticketCount.toString();
+
       const message = `
 🎉 *RAFFLE WINNER ANNOUNCED!*
 
 🏆 Prize: ${raffle.prizeAmount} ${raffle.prizeType}
 
-👤 Winner: \`${winner.walletAddress.slice(0, 8)}...${winner.walletAddress.slice(-6)}\`
-🎫 Winning Tickets: ${winner.ticketCount.toLocaleString()} (${winPercentage}% chance)
+👤 Winner: ${winner.walletAddress.slice(0, 8)}...${winner.walletAddress.slice(-6)}
+🎫 Winning Tickets: ${ticketCountStr} (${winPercentage}% chance)
 📊 Total Participants: ${totalParticipants.toLocaleString()}
 🎟️ Total Tickets: ${totalTickets.toLocaleString()}${randomnessSection}
 Congratulations to the winner! 🎊
