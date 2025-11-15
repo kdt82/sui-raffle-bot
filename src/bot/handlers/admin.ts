@@ -2,7 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
 import { prisma } from '../../utils/database';
 import { logger } from '../../utils/logger';
-import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS } from '../../utils/constants';
+import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS, formatDate } from '../../utils/constants';
 import { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
 import { conversationManager } from '../conversation';
 
@@ -418,6 +418,109 @@ export async function handleAwardPrize(msg: TelegramBot.Message): Promise<void> 
   } catch (error) {
     logger.error('Error awarding prize:', error);
     await bot.sendMessage(chatId, '❌ Error awarding prize. Please try again.');
+  }
+}
+
+export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+
+  try {
+    // Get raffle ID from command or use most recent ended raffle
+    const args = msg.text?.split(' ').slice(1);
+    let raffleId = args?.[0];
+
+    let raffle;
+    if (raffleId) {
+      raffle = await prisma.raffle.findUnique({
+        where: { id: raffleId },
+        include: {
+          winners: true,
+          _count: {
+            select: { tickets: true }
+          }
+        },
+      });
+
+      if (!raffle) {
+        await bot.sendMessage(chatId, '❌ Raffle not found.');
+        return;
+      }
+    } else {
+      // Get most recent ended raffle
+      raffle = await prisma.raffle.findFirst({
+        where: {
+          status: { in: [RAFFLE_STATUS.ENDED, RAFFLE_STATUS.WINNER_SELECTED] },
+        },
+        orderBy: { endTime: 'desc' },
+        include: {
+          winners: true,
+          _count: {
+            select: { tickets: true }
+          }
+        },
+      });
+
+      if (!raffle) {
+        await bot.sendMessage(chatId, '❌ No ended raffle found.');
+        return;
+      }
+    }
+
+    if (raffle.winners.length === 0) {
+      await bot.sendMessage(
+        chatId,
+        `📊 Raffle Information\n\n` +
+        `Raffle ID: ${raffle.id}\n` +
+        `Status: ${raffle.status}\n` +
+        `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n` +
+        `Ended: ${formatDate(raffle.endTime)} UTC\n\n` +
+        `⏳ No winner selected yet. This may happen automatically soon.`
+      );
+      return;
+    }
+
+    const winner = raffle.winners[0];
+
+    // Get total tickets for the raffle
+    const totalTicketsResult = await prisma.ticket.aggregate({
+      where: { raffleId: raffle.id },
+      _sum: { ticketCount: true },
+      _count: true,
+    });
+
+    const totalTickets = totalTicketsResult._sum.ticketCount || 0;
+    const totalParticipants = totalTicketsResult._count || 0;
+    const winnerPercentage = totalTickets > 0 
+      ? ((winner.ticketCount / totalTickets) * 100).toFixed(2)
+      : '0';
+
+    const statusEmoji = winner.prizeAwarded ? '✅' : '⏳';
+    const awardedText = winner.prizeAwarded && winner.awardedAt
+      ? `\n📅 Awarded: ${formatDate(winner.awardedAt)} UTC`
+      : '\n⏳ Prize not yet awarded';
+
+    await bot.sendMessage(
+      chatId,
+      `🏆 *Raffle Winner*\n\n` +
+      `${statusEmoji} *Status:* ${winner.prizeAwarded ? 'Prize Awarded' : 'Pending Award'}\n\n` +
+      `*Raffle Details:*\n` +
+      `ID: \`${raffle.id}\`\n` +
+      `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n` +
+      `Ended: ${formatDate(raffle.endTime)} UTC\n\n` +
+      `*Winner Details:*\n` +
+      `Wallet: \`${winner.walletAddress}\`\n` +
+      `Tickets: ${winner.ticketCount.toLocaleString()} (${winnerPercentage}% of total)\n` +
+      `Selected: ${formatDate(winner.selectedAt)} UTC${awardedText}\n\n` +
+      `*Raffle Stats:*\n` +
+      `Total Participants: ${totalParticipants}\n` +
+      `Total Tickets: ${totalTickets.toLocaleString()}\n\n` +
+      `${!winner.prizeAwarded ? '💡 Use /award_prize to mark as awarded' : ''}`,
+      { parse_mode: 'Markdown' }
+    );
+
+  } catch (error) {
+    logger.error('Error showing winner:', error);
+    await bot.sendMessage(chatId, '❌ Error retrieving winner information. Please try again.');
   }
 }
 

@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand, handleWalletStatusCommand, handleUnlinkWalletCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
@@ -215,6 +215,16 @@ export function registerAdminHandlers(): void {
         await handleAwardPrize(msg);
       } catch (error) {
         logger.error('Error handling /award_prize command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/winner/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleShowWinner(msg);
+      } catch (error) {
+        logger.error('Error handling /winner command:', error);
       }
     });
   });
