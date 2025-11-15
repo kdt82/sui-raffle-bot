@@ -219,8 +219,8 @@ Check your tickets: /mytickets
       const totalParticipants = raffle.tickets.filter(t => t.ticketCount > 0).length;
       const totalTickets = raffle.tickets.reduce((sum, t) => sum + t.ticketCount, 0);
 
-      // Calculate winner's win percentage
-      const winPercentage = ((winner.ticketCount / totalTickets) * 100).toFixed(2);
+      // Calculate winner's win percentage (convert BigInt to Number for calculation)
+      const winPercentage = ((Number(winner.ticketCount) / totalTickets) * 100).toFixed(2);
 
       // Build randomness proof section
       let randomnessSection = '';

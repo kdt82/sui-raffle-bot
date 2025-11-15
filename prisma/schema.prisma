@@ -101,7 +101,7 @@ model Winner {
   id                String   @id @default(cuid())
   raffleId          String
   walletAddress     String
-  ticketCount       Int
+  ticketCount       BigInt   // Changed to BigInt to support large ticket counts
   selectedAt        DateTime @default(now())
   prizeAwarded      Boolean  @default(false)
   awardedAt         DateTime?
@@ -109,7 +109,7 @@ model Winner {
   selectionMethod   String?  // 'on-chain' or 'client-side'
   randomnessEpoch   String?  // SUI blockchain epoch when randomness was generated
   randomnessProof   String?  // JSON proof data for verification
-  totalTickets      Int?     // Total tickets in raffle when winner was selected
+  totalTickets      BigInt?  // Total tickets in raffle when winner was selected
   totalParticipants Int?     // Total participants when winner was selected
 
   raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)

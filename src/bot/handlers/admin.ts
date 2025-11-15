@@ -536,7 +536,7 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
     const totalTickets = totalTicketsResult._sum.ticketCount || 0;
     const totalParticipants = totalTicketsResult._count || 0;
     const winnerPercentage = totalTickets > 0 
-      ? ((winner.ticketCount / totalTickets) * 100).toFixed(2)
+      ? ((Number(winner.ticketCount) / totalTickets) * 100).toFixed(2)
       : '0';
 
     const statusEmoji = winner.prizeAwarded ? '✅' : '⏳';
