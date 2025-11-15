@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand, handleWalletStatusCommand, handleUnlinkWalletCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleSelectWinner, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleSelectWinner, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets, handleBackfillTicketNumber } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
@@ -427,6 +427,16 @@ export function registerAdminHandlers(): void {
         await handleWalletListCommand(msg);
       } catch (error) {
         logger.error('Error handling /walletlist command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/backfill_ticket_number/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleBackfillTicketNumber(msg);
+      } catch (error) {
+        logger.error('Error handling /backfill_ticket_number command:', error);
       }
     });
   });

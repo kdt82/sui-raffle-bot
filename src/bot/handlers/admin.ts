@@ -1123,3 +1123,78 @@ export async function handleRemoveTickets(msg: TelegramBot.Message): Promise<voi
     await bot.sendMessage(chatId, '❌ Failed to remove tickets. Please check the wallet address format and try again.');
   }
 }
+
+/**
+ * Backfill winning ticket number for existing winner (admin only)
+ */
+export async function handleBackfillTicketNumber(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+
+  try {
+    // Find winners without ticket numbers
+    const winners = await prisma.winner.findMany({
+      where: {
+        winningTicketNumber: null,
+      },
+      include: {
+        raffle: {
+          include: {
+            tickets: true,
+          },
+        },
+      },
+    });
+
+    if (winners.length === 0) {
+      await bot.sendMessage(chatId, '✅ All winners already have ticket numbers!');
+      return;
+    }
+
+    await bot.sendMessage(chatId, `🔄 Backfilling ${winners.length} winner(s)...`);
+
+    for (const winner of winners) {
+      // Find the winner's ticket range
+      let cumulativeTickets = BigInt(0);
+      let winnerTicketStart = BigInt(0);
+      let winnerTicketEnd = BigInt(0);
+
+      // Sort tickets to ensure consistent ordering
+      const sortedTickets = winner.raffle.tickets.sort((a, b) => 
+        a.walletAddress.localeCompare(b.walletAddress)
+      );
+
+      for (const ticket of sortedTickets) {
+        const ticketCount = BigInt(ticket.ticketCount);
+        if (ticket.walletAddress === winner.walletAddress) {
+          winnerTicketStart = cumulativeTickets;
+          winnerTicketEnd = cumulativeTickets + ticketCount - BigInt(1);
+          break;
+        }
+        cumulativeTickets += ticketCount;
+      }
+
+      // Generate a random ticket number within the winner's range
+      const rangeSize = Number(winnerTicketEnd - winnerTicketStart + BigInt(1));
+      const randomOffset = Math.floor(Math.random() * rangeSize);
+      const winningTicketNumber = winnerTicketStart + BigInt(randomOffset);
+
+      // Update the winner record
+      await prisma.winner.update({
+        where: { id: winner.id },
+        data: {
+          winningTicketNumber: winningTicketNumber,
+        },
+      });
+
+      logger.info(`Backfilled ticket number ${winningTicketNumber} for winner ${winner.walletAddress}`);
+    }
+
+    await bot.sendMessage(
+      chatId,
+      `✅ Backfill complete!\n\nUpdated ${winners.length} winner(s) with ticket numbers in their respective ranges.`
+    );
+  } catch (error) {
+    logger.error('Error backfilling ticket numbers:', error);
+    await bot.sendMessage(chatId, '❌ Error backfilling ticket numbers. Check logs.');
+  }
+}
