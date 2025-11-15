@@ -216,43 +216,43 @@ Check your tickets: /mytickets
       if (!raffle || raffle.winners.length === 0) return;
 
       const winner = raffle.winners[0];
-      const totalParticipants = raffle.tickets.filter(t => t.ticketCount > 0).length;
-      const totalTickets = raffle.tickets.reduce((sum, t) => sum + t.ticketCount, 0);
 
-      // Calculate winner's win percentage (convert BigInt to Number for calculation)
-      const winPercentage = ((Number(winner.ticketCount) / totalTickets) * 100).toFixed(2);
-
-      // Build randomness proof section
-      let randomnessSection = '';
-      if (winner.selectionMethod === 'on-chain' && winner.randomnessEpoch) {
-        randomnessSection = `\n🔐 Selection Method: SUI On-Chain Randomness\n📍 Blockchain Epoch: ${winner.randomnessEpoch}\n`;
-      } else if (winner.selectionMethod === 'client-side') {
-        randomnessSection = `\n🔐 Selection Method: Weighted Random\n`;
+      // Only broadcast if transaction hash is provided (prize awarded)
+      if (!txHash) {
+        logger.info('No transaction hash provided, skipping broadcast');
+        return;
       }
 
-      // Build transaction section if txHash provided
-      let transactionSection = '';
-      if (txHash) {
-        transactionSection = `\n\n💰 Prize Status: AWARDED ✅\n🔗 Transaction: https://suiscan.xyz/mainnet/tx/${txHash}`;
-      }
-
-      // Convert BigInt to string for display
-      const ticketCountStr = winner.ticketCount.toString();
+      // Format winning ticket number
       const winningTicketText = winner.winningTicketNumber !== null && winner.winningTicketNumber !== undefined
-        ? `\n🎰 Winning Ticket #${winner.winningTicketNumber.toString()}`
+        ? `\n🎰 Winning Ticket: #${winner.winningTicketNumber.toString()}`
         : '';
 
+      // Format ticket count with commas
+      const ticketCountFormatted = Number(winner.ticketCount).toLocaleString();
+
+      // Build the message using the AQUA template
       const message = `
-🎉 RAFFLE WINNER ANNOUNCED!
+� AQUA RAFFLE — WINNER CONFIRMED! 🌊
 
-🏆 Prize: ${raffle.prizeAmount} ${raffle.prizeType}
+The tides have settled and the prize has officially been marked AWARDED. Thanks to everyone who dove in for this round!
 
-👤 Winner: ${winner.walletAddress.slice(0, 8)}...${winner.walletAddress.slice(-6)}
-🎫 Winning Tickets: ${ticketCountStr} (${winPercentage}% chance)${winningTicketText}
-📊 Total Participants: ${totalParticipants.toLocaleString()}
-🎟️ Total Tickets: ${totalTickets.toLocaleString()}${randomnessSection}${transactionSection}
+� Prize: ${raffle.prizeAmount} ${raffle.prizeType}
+🏷 Raffle ID: ${raffle.id}
 
-Congratulations to the winner! 🎊
+🏆 WINNER:
+${winner.walletAddress}
+� Tickets: ${ticketCountFormatted}${winningTicketText}
+
+� Transaction:
+https://suiscan.xyz/mainnet/tx/${txHash}
+
+Hash: ${txHash}
+
+Prize has been delivered and the winner announced on the broadcast channel.
+More waves coming soon… stay hydrated, stay ready. 🌊🐾
+
+#AQUAonSUI #SuiNetwork
       `.trim();
 
       // Broadcast to main channel only (no individual DMs)
