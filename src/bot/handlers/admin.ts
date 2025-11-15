@@ -565,7 +565,7 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
         `This winner was selected using verifiable on-chain randomness from the SUI blockchain.`;
     } else if (winner.selectionMethod === 'client-side') {
       randomnessSection = `\n\n🔐 SELECTION METHOD:\n` +
-        `Weighted Random (Client-side)`;
+        `Weighted Random`;
     }
 
     logger.info('Sending winner message');
@@ -708,8 +708,8 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
         randomnessSection = `\n🔐 Randomness Proof:\n` +
           `Method: SUI On-Chain Randomness\n` +
           `Blockchain Epoch: ${winner.randomnessEpoch}\n\n`;
-      } else if (winner.selectionMethod) {
-        randomnessSection = `\nSelection Method: ${winner.selectionMethod}\n\n`;
+      } else if (winner.selectionMethod === 'client-side') {
+        randomnessSection = `\nSelection Method: Weighted Random\n\n`;
       }
 
       // Convert BigInt to string for display
