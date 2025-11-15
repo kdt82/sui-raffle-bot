@@ -242,31 +242,22 @@ Check your tickets: /mytickets
 Congratulations to the winner! 🎊
       `.trim();
 
-      // Broadcast to all participants
-      const walletAddresses = raffle.tickets.map(t => t.walletAddress);
-      const walletUsers = await prisma.walletUser.findMany({
-        where: { walletAddress: { in: walletAddresses } },
-      });
-
-      for (const walletUser of walletUsers) {
-        const prefs = await this.getUserPreferences(walletUser.telegramUserId);
-        if (prefs.winnerAnnouncements) {
-          try {
-            const isWinner = walletUser.walletAddress === winner.walletAddress;
-            const userMessage = isWinner
-              ? `🎉🎉🎉 *YOU WON!* 🎉🎉🎉\n\n${message}\n\nThe prize will be sent to your wallet shortly!`
-              : message;
-
-            await bot.sendMessage(Number(walletUser.telegramUserId), userMessage, {
-              parse_mode: 'Markdown',
-            });
-          } catch (error) {
-            logger.error(`Failed to send winner announcement to user ${walletUser.telegramUserId}:`, error);
-          }
+      // Broadcast to main channel only (no individual DMs)
+      const broadcastChannelId = process.env.TELEGRAM_BROADCAST_CHANNEL_ID;
+      if (broadcastChannelId) {
+        try {
+          await bot.sendMessage(broadcastChannelId, message, {
+            parse_mode: 'Markdown',
+          });
+          logger.info(`Broadcasted winner announcement to channel for raffle ${raffleId}`);
+        } catch (error) {
+          logger.error(`Failed to broadcast winner announcement to channel:`, error);
         }
+      } else {
+        logger.warn('No broadcast channel configured for winner announcement');
       }
 
-      logger.info(`Broadcasted winner announcement for raffle ${raffleId}`);
+      logger.info(`Winner announcement completed for raffle ${raffleId}`);
     } catch (error) {
       logger.error(`Failed to broadcast winner announcement for raffle ${raffleId}:`, error);
     }

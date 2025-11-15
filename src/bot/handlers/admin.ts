@@ -438,33 +438,9 @@ export async function handleAwardPrize(msg: TelegramBot.Message): Promise<void> 
       `*Transaction:*\n` +
       `🔗 [View on SuiScan](${suiscanLink})\n` +
       `Hash: \`${txHash}\`\n\n` +
-      `Winner will be notified with transaction details.`,
+      `Prize award recorded. Winner announcement sent to broadcast channel.`,
       { parse_mode: 'Markdown', disable_web_page_preview: true }
     );
-
-    // Notify winner if they have linked their wallet
-    const walletUser = await prisma.walletUser.findUnique({
-      where: { walletAddress: winner.walletAddress },
-    });
-
-    if (walletUser) {
-      try {
-        await bot.sendMessage(
-          walletUser.telegramUserId.toString(),
-          `🎉 *Congratulations! Your Prize Has Been Sent!*\n\n` +
-          `*Prize:* ${endedRaffle.prizeAmount} ${endedRaffle.prizeType}\n` +
-          `*Your Wallet:* \`${winner.walletAddress}\`\n` +
-          `*Your Tickets:* ${winner.ticketCount.toLocaleString()}\n\n` +
-          `*Transaction Details:*\n` +
-          `🔗 [View on SuiScan](${suiscanLink})\n` +
-          `Hash: \`${txHash}\`\n\n` +
-          `Thank you for participating! 🎊`,
-          { parse_mode: 'Markdown', disable_web_page_preview: true }
-        );
-      } catch (error) {
-        logger.warn('Could not notify winner:', error);
-      }
-    }
 
     // AUDIT LOG: Prize awarded (non-blocking)
     auditService.logPrizeAwarded(

@@ -65,7 +65,7 @@ export async function selectWinner(raffleId: string): Promise<void> {
     // Track metrics
     trackRaffleEvent('winner_selected');
 
-    // Broadcast winner announcement
+    // Broadcast winner announcement to main channel only
     await notificationService.broadcastWinnerAnnouncement(raffleId);
 
     // Send admin alert
@@ -74,32 +74,9 @@ export async function selectWinner(raffleId: string): Promise<void> {
       `Winner: \`${winner.walletAddress.slice(0, 8)}...${winner.walletAddress.slice(-6)}\`\n` +
       `Tickets: ${winner.ticketCount.toLocaleString()}\n` +
       `Method: ${winner.selectionMethod}\n\n` +
-      `Award the prize using /award_prize`
+      `Award the prize using /award_prize <txhash>`
     );
 
-    // Notify winner if wallet is linked
-    const walletUser = await prisma.walletUser.findUnique({
-      where: { walletAddress: winner.walletAddress },
-    });
-
-    if (walletUser) {
-      try {
-        const raffle = await prisma.raffle.findUnique({
-          where: { id: raffleId },
-        });
-
-        await bot.sendMessage(
-          walletUser.telegramUserId.toString(),
-          `🎉 Congratulations! You won the raffle!\n\n` +
-          `Prize: ${raffle?.prizeAmount} ${raffle?.prizeType}\n` +
-          `Your tickets: ${winner.ticketCount.toLocaleString()}\n` +
-          `Wallet: ${winner.walletAddress}\n\n` +
-          `The prize will be awarded manually by an admin.`
-        );
-      } catch (error) {
-        logger.warn(`Could not notify winner ${walletUser.telegramUserId}:`, error);
-      }
-    }
   } catch (error) {
     logger.error('Error selecting winner:', error);
     throw error;
