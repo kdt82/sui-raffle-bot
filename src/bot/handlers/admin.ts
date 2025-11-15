@@ -570,6 +570,11 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
 
     logger.info('Sending winner message');
 
+    // Format winning ticket number if available
+    const winningTicketText = winner.winningTicketNumber !== null && winner.winningTicketNumber !== undefined
+      ? `\nWinning Ticket #: ${winner.winningTicketNumber.toString()}`
+      : '';
+
     await bot.sendMessage(
       chatId,
       `🏆 RAFFLE WINNER\n\n` +
@@ -580,7 +585,7 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       `Ended: ${formatDate(raffle.endTime)} UTC\n\n` +
       `WINNER DETAILS:\n` +
       `Wallet: ${winner.walletAddress}\n` +
-      `Tickets: ${ticketCountStr} (${winnerPercentage}% of total)\n` +
+      `Tickets: ${ticketCountStr} (${winnerPercentage}% of total)${winningTicketText}\n` +
       `Selected: ${formatDate(winner.selectedAt)} UTC${awardedText}${txSection}${randomnessSection}\n\n` +
       `RAFFLE STATS:\n` +
       `Total Participants: ${totalParticipants}\n` +

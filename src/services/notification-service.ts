@@ -238,6 +238,9 @@ Check your tickets: /mytickets
 
       // Convert BigInt to string for display
       const ticketCountStr = winner.ticketCount.toString();
+      const winningTicketText = winner.winningTicketNumber !== null && winner.winningTicketNumber !== undefined
+        ? `\n🎰 Winning Ticket #${winner.winningTicketNumber.toString()}`
+        : '';
 
       const message = `
 🎉 RAFFLE WINNER ANNOUNCED!
@@ -245,7 +248,7 @@ Check your tickets: /mytickets
 🏆 Prize: ${raffle.prizeAmount} ${raffle.prizeType}
 
 👤 Winner: ${winner.walletAddress.slice(0, 8)}...${winner.walletAddress.slice(-6)}
-🎫 Winning Tickets: ${ticketCountStr} (${winPercentage}% chance)
+🎫 Winning Tickets: ${ticketCountStr} (${winPercentage}% chance)${winningTicketText}
 📊 Total Participants: ${totalParticipants.toLocaleString()}
 🎟️ Total Tickets: ${totalTickets.toLocaleString()}${randomnessSection}${transactionSection}
 

@@ -98,19 +98,20 @@ model Admin {
 }
 
 model Winner {
-  id                String   @id @default(cuid())
-  raffleId          String
-  walletAddress     String
-  ticketCount       BigInt   // Changed to BigInt to support large ticket counts
-  selectedAt        DateTime @default(now())
-  prizeAwarded      Boolean  @default(false)
-  awardedAt         DateTime?
-  awardTxHash       String?  // Transaction hash/digest for prize transfer
-  selectionMethod   String?  // 'on-chain' or 'client-side'
-  randomnessEpoch   String?  // SUI blockchain epoch when randomness was generated
-  randomnessProof   String?  // JSON proof data for verification
-  totalTickets      BigInt?  // Total tickets in raffle when winner was selected
-  totalParticipants Int?     // Total participants when winner was selected
+  id                  String   @id @default(cuid())
+  raffleId            String
+  walletAddress       String
+  ticketCount         BigInt   // Changed to BigInt to support large ticket counts
+  winningTicketNumber BigInt?  // The specific ticket number that won (0 to totalTickets-1)
+  selectedAt          DateTime @default(now())
+  prizeAwarded        Boolean  @default(false)
+  awardedAt           DateTime?
+  awardTxHash         String?  // Transaction hash/digest for prize transfer
+  selectionMethod     String?  // 'on-chain' or 'client-side'
+  randomnessEpoch     String?  // SUI blockchain epoch when randomness was generated
+  randomnessProof     String?  // JSON proof data for verification
+  totalTickets        BigInt?  // Total tickets in raffle when winner was selected
+  totalParticipants   Int?     // Total participants when winner was selected
 
   raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
 

@@ -71,29 +71,29 @@ export class SuiRandomnessService {
    * Generate weighted random selection using on-chain randomness
    * @param weights - Array of weights (e.g., ticket counts)
    * @param seed - Optional seed for determinism
-   * @returns Index of the selected item
+   * @returns Object with selected index and the winning ticket number
    */
-  async generateWeightedRandom(weights: number[], seed?: string): Promise<number> {
+  async generateWeightedRandom(weights: number[], seed?: string): Promise<{ index: number; winningTicket: number }> {
     const totalWeight = weights.reduce((sum, w) => sum + w, 0);
     
     if (totalWeight === 0) {
       throw new Error('Total weight is zero');
     }
 
-    // Generate random number between 0 and totalWeight
-    const random = await this.generateOnChainRandom(totalWeight, seed);
+    // Generate random number between 0 and totalWeight - this IS the winning ticket number
+    const winningTicket = await this.generateOnChainRandom(totalWeight, seed);
     
     // Find the selected index based on cumulative weights
     let cumulative = 0;
     for (let i = 0; i < weights.length; i++) {
       cumulative += weights[i];
-      if (random < cumulative) {
-        return i;
+      if (winningTicket < cumulative) {
+        return { index: i, winningTicket };
       }
     }
     
     // Fallback to last item (shouldn't reach here)
-    return weights.length - 1;
+    return { index: weights.length - 1, winningTicket };
   }
 
   /**
@@ -186,24 +186,24 @@ export class SuiRandomnessService {
  * Fallback weighted random selection (client-side)
  * Used when on-chain randomness is not available
  */
-export function clientSideWeightedRandom(weights: number[]): number {
+export function clientSideWeightedRandom(weights: number[]): { index: number; winningTicket: number } {
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
   
   if (totalWeight === 0) {
     throw new Error('Total weight is zero');
   }
 
-  const random = Math.floor(Math.random() * totalWeight);
+  const winningTicket = Math.floor(Math.random() * totalWeight);
   
   let cumulative = 0;
   for (let i = 0; i < weights.length; i++) {
     cumulative += weights[i];
-    if (random < cumulative) {
-      return i;
+    if (winningTicket < cumulative) {
+      return { index: i, winningTicket };
     }
   }
   
-  return weights.length - 1;
+  return { index: weights.length - 1, winningTicket };
 }
 
 // Singleton instance

@@ -41,6 +41,7 @@ export async function selectWinner(raffleId: string): Promise<void> {
         raffleId,
         walletAddress: winner.walletAddress,
         ticketCount: winner.ticketCount,
+        winningTicketNumber: winner.winningTicketNumber,
         selectionMethod: winner.selectionMethod,
         randomnessEpoch: winner.randomnessProof?.epoch,
         randomnessProof: winner.randomnessProof ? JSON.stringify(winner.randomnessProof) : null,
@@ -89,6 +90,7 @@ interface TicketWithWeight {
 interface WinnerResult extends TicketWithWeight {
   selectionMethod: 'on-chain' | 'client-side';
   randomnessProof?: any;
+  winningTicketNumber: number;
 }
 
 /**
@@ -104,7 +106,7 @@ async function selectWinnerWithRandomness(
       logger.info(`Using SUI on-chain randomness for raffle ${raffleId}`);
       
       const weights = tickets.map(t => t.ticketCount);
-      const selectedIndex = await suiRandomnessService.generateWeightedRandom(
+      const { index: selectedIndex, winningTicket } = await suiRandomnessService.generateWeightedRandom(
         weights,
         raffleId
       );
@@ -120,16 +122,18 @@ async function selectWinnerWithRandomness(
         ...tickets[selectedIndex],
         selectionMethod: 'on-chain',
         randomnessProof: proof,
+        winningTicketNumber: winningTicket,
       };
     } else {
       logger.info(`Using client-side randomness for raffle ${raffleId} (on-chain not configured)`);
       
       const weights = tickets.map(t => t.ticketCount);
-      const selectedIndex = clientSideWeightedRandom(weights);
+      const { index: selectedIndex, winningTicket } = clientSideWeightedRandom(weights);
       
       return {
         ...tickets[selectedIndex],
         selectionMethod: 'client-side',
+        winningTicketNumber: winningTicket,
       };
     }
   } catch (error) {
@@ -137,11 +141,12 @@ async function selectWinnerWithRandomness(
     
     // Fallback to client-side randomness
     const weights = tickets.map(t => t.ticketCount);
-    const selectedIndex = clientSideWeightedRandom(weights);
+    const { index: selectedIndex, winningTicket } = clientSideWeightedRandom(weights);
     
     return {
       ...tickets[selectedIndex],
       selectionMethod: 'client-side',
+      winningTicketNumber: winningTicket,
     };
   }
 }
