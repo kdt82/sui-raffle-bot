@@ -498,7 +498,7 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       });
 
       if (!raffle) {
-        await bot.sendMessage(chatId, '❌ No ended raffle found.');
+        await bot.sendMessage(chatId, '❌ No ended raffle found. Create a raffle first using /create_raffle');
         return;
       }
     }

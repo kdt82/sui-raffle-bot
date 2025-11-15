@@ -26,8 +26,19 @@ export async function handleAdminHelpCommand(msg: TelegramBot.Message): Promise<
 /cancel\\_raffle <raffleId> - Cancel active raffle
   • Example: /cancel\\_raffle cm2abc123
 
-/award\\_prize <raffleId> - Mark prize as awarded
-  • Example: /award\\_prize cm2abc123
+*WINNER MANAGEMENT*
+/winner - View current/recent winner details
+  • Shows winner info, randomness proof, transaction
+  • Use: /winner or /winner <raffleId>
+
+/select\\_winner - Manually trigger winner selection
+  • For ended raffles without winners
+  • Use: /select\\_winner or /select\\_winner <raffleId>
+
+/award\\_prize <txhash> - Mark prize as sent
+  • Requires transaction hash or SuiScan link
+  • Example: /award\\_prize A1B2C3...
+  • Example: /award\\_prize https://suiscan.xyz/mainnet/tx/...
 
 *TICKET MANAGEMENT*
 /add\\_tickets <raffleId> <wallet> <amount>
@@ -54,9 +65,9 @@ export async function handleAdminHelpCommand(msg: TelegramBot.Message): Promise<
 /auditfailures - Failed actions in last 24h
 
 *WALLETS & USERS*
-/walletlist - List all linked wallets (NEW!)
+/walletlist - List all linked wallets
   • Shows wallet addresses and linked Telegram users
-  • Useful for manual crediting
+  • Useful for manual verification
 
 *BACKUP & RECOVERY*
 /backup - Create system backup
@@ -79,11 +90,9 @@ export async function handleAdminHelpCommand(msg: TelegramBot.Message): Promise<
 /start - Welcome message
 /leaderboard - Current raffle standings
 /mytickets - User's ticket count
-/linkwallet <address> - Link wallet
-/walletstatus - View linked wallet
-/unlinkwallet - Remove wallet link
 
-💡 Tip: All admin commands require admin privileges
+💡 *Note:* Wallet linking removed - all wallets with tickets automatically eligible
+🔐 *Randomness:* Winners selected using SUI on-chain randomness (verifiable)
 📝 Commands can be used in private chat or admin group
     `.trim();
 
