@@ -256,7 +256,7 @@ More waves coming soon… stay hydrated, stay ready. 🌊🐾
       `.trim();
 
       // Broadcast to main channel only (no individual DMs)
-      const broadcastChannelId = process.env.TELEGRAM_BROADCAST_CHANNEL_ID;
+      const broadcastChannelId = process.env.MAIN_CHAT_ID;
       if (broadcastChannelId) {
         try {
           await bot.sendMessage(broadcastChannelId, message);
