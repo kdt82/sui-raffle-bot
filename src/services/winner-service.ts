@@ -35,12 +35,17 @@ export async function selectWinner(raffleId: string): Promise<void> {
     // Use SUI's on-chain randomness if configured, otherwise fall back to client-side
     const winner = await selectWinnerWithRandomness(raffleId, tickets);
 
-    // Create winner record
+    // Create winner record with randomness proof
     const winnerRecord = await prisma.winner.create({
       data: {
         raffleId,
         walletAddress: winner.walletAddress,
         ticketCount: winner.ticketCount,
+        selectionMethod: winner.selectionMethod,
+        randomnessEpoch: winner.randomnessProof?.epoch,
+        randomnessProof: winner.randomnessProof ? JSON.stringify(winner.randomnessProof) : null,
+        totalTickets,
+        totalParticipants: tickets.length,
       },
     });
 

@@ -219,16 +219,26 @@ Check your tickets: /mytickets
       const totalParticipants = raffle.tickets.filter(t => t.ticketCount > 0).length;
       const totalTickets = raffle.tickets.reduce((sum, t) => sum + t.ticketCount, 0);
 
+      // Calculate winner's win percentage
+      const winPercentage = ((winner.ticketCount / totalTickets) * 100).toFixed(2);
+
+      // Build randomness proof section
+      let randomnessSection = '';
+      if (winner.selectionMethod === 'on-chain' && winner.randomnessEpoch) {
+        randomnessSection = `\n🔐 *Selection Method:* SUI On-Chain Randomness\n📍 Blockchain Epoch: ${winner.randomnessEpoch}\n`;
+      } else if (winner.selectionMethod === 'client-side') {
+        randomnessSection = `\n🔐 *Selection Method:* Weighted Random\n`;
+      }
+
       const message = `
 🎉 *RAFFLE WINNER ANNOUNCED!*
 
 🏆 Prize: ${raffle.prizeAmount} ${raffle.prizeType}
 
 👤 Winner: \`${winner.walletAddress.slice(0, 8)}...${winner.walletAddress.slice(-6)}\`
-🎫 Winning Tickets: ${winner.ticketCount.toLocaleString()}
+🎫 Winning Tickets: ${winner.ticketCount.toLocaleString()} (${winPercentage}% chance)
 📊 Total Participants: ${totalParticipants.toLocaleString()}
-🎟️ Total Tickets: ${totalTickets.toLocaleString()}
-
+🎟️ Total Tickets: ${totalTickets.toLocaleString()}${randomnessSection}
 Congratulations to the winner! 🎊
       `.trim();
 

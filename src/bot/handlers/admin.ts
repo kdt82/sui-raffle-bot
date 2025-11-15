@@ -499,6 +499,18 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       ? `\n📅 Awarded: ${formatDate(winner.awardedAt)} UTC`
       : '\n⏳ Prize not yet awarded';
 
+    // Build randomness proof section
+    let randomnessSection = '';
+    if (winner.selectionMethod === 'on-chain' && winner.randomnessEpoch) {
+      randomnessSection = `\n\n*🔐 Randomness Proof:*\n` +
+        `Method: SUI On-Chain Randomness\n` +
+        `Blockchain Epoch: ${winner.randomnessEpoch}\n` +
+        `This winner was selected using verifiable on-chain randomness from the SUI blockchain.`;
+    } else if (winner.selectionMethod === 'client-side') {
+      randomnessSection = `\n\n*🔐 Selection Method:*\n` +
+        `Weighted Random (Client-side)`;
+    }
+
     await bot.sendMessage(
       chatId,
       `🏆 *Raffle Winner*\n\n` +
@@ -510,7 +522,7 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       `*Winner Details:*\n` +
       `Wallet: \`${winner.walletAddress}\`\n` +
       `Tickets: ${winner.ticketCount.toLocaleString()} (${winnerPercentage}% of total)\n` +
-      `Selected: ${formatDate(winner.selectedAt)} UTC${awardedText}\n\n` +
+      `Selected: ${formatDate(winner.selectedAt)} UTC${awardedText}${randomnessSection}\n\n` +
       `*Raffle Stats:*\n` +
       `Total Participants: ${totalParticipants}\n` +
       `Total Tickets: ${totalTickets.toLocaleString()}\n\n` +
@@ -605,12 +617,23 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
     });
 
     if (winner) {
+      // Build randomness proof section
+      let randomnessSection = '';
+      if (winner.selectionMethod === 'on-chain' && winner.randomnessEpoch) {
+        randomnessSection = `\n*🔐 Randomness Proof:*\n` +
+          `Method: SUI On-Chain Randomness\n` +
+          `Blockchain Epoch: ${winner.randomnessEpoch}\n\n`;
+      } else if (winner.selectionMethod) {
+        randomnessSection = `\n*Selection Method:* ${winner.selectionMethod}\n\n`;
+      }
+
       await bot.sendMessage(
         chatId,
         `🎉 *Winner Selected!*\n\n` +
         `*Winner Details:*\n` +
         `Wallet: \`${winner.walletAddress}\`\n` +
-        `Tickets: ${winner.ticketCount.toLocaleString()}\n\n` +
+        `Tickets: ${winner.ticketCount.toLocaleString()}\n` +
+        randomnessSection +
         `*Raffle Details:*\n` +
         `ID: \`${raffle.id}\`\n` +
         `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
