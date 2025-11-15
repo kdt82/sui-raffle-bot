@@ -462,9 +462,13 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
   const chatId = msg.chat.id;
 
   try {
+    logger.info('handleShowWinner called');
+
     // Get raffle ID from command or use most recent ended raffle
     const args = msg.text?.split(' ').slice(1);
     let raffleId = args?.[0];
+
+    logger.info(`Looking for raffle: ${raffleId || 'most recent ended'}`);
 
     let raffle;
     if (raffleId) {
@@ -498,10 +502,13 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       });
 
       if (!raffle) {
+        logger.info('No ended raffle found');
         await bot.sendMessage(chatId, '❌ No ended raffle found. Create a raffle first using /create_raffle');
         return;
       }
     }
+
+    logger.info(`Found raffle: ${raffle.id}, winners: ${raffle.winners.length}`);
 
     if (raffle.winners.length === 0) {
       await bot.sendMessage(
@@ -511,12 +518,13 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
         `Status: ${raffle.status}\n` +
         `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n` +
         `Ended: ${formatDate(raffle.endTime)} UTC\n\n` +
-        `⏳ No winner selected yet. This may happen automatically soon.`
+        `⏳ No winner selected yet. Use /select_winner to select a winner.`
       );
       return;
     }
 
     const winner = raffle.winners[0];
+    logger.info(`Winner found: ${winner.walletAddress}`);
 
     // Get total tickets for the raffle
     const totalTicketsResult = await prisma.ticket.aggregate({
@@ -553,6 +561,8 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
         `Weighted Random (Client-side)`;
     }
 
+    logger.info('Sending winner message');
+
     await bot.sendMessage(
       chatId,
       `🏆 *Raffle Winner*\n\n` +
@@ -572,9 +582,20 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
       { parse_mode: 'Markdown', disable_web_page_preview: true }
     );
 
+    logger.info('Winner message sent successfully');
+
   } catch (error) {
-    logger.error('Error showing winner:', error);
-    await bot.sendMessage(chatId, '❌ Error retrieving winner information. Please try again.');
+    logger.error('Error in handleShowWinner:', error);
+    logger.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    try {
+      await bot.sendMessage(
+        chatId, 
+        `❌ Error retrieving winner information.\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease check logs for details.`
+      );
+    } catch (sendError) {
+      logger.error('Failed to send error message:', sendError);
+    }
   }
 }
 
@@ -582,9 +603,13 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
   const chatId = msg.chat.id;
 
   try {
+    logger.info('handleSelectWinner called');
+
     // Get raffle ID from command or use most recent ended raffle
     const args = msg.text?.split(' ').slice(1);
     let raffleId = args?.[0];
+
+    logger.info(`Looking for raffle to select winner: ${raffleId || 'most recent ended'}`);
 
     let raffle;
     if (raffleId) {
@@ -612,10 +637,13 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
       });
 
       if (!raffle) {
+        logger.info('No ended raffle without winner found');
         await bot.sendMessage(chatId, '❌ No ended raffle found that needs a winner.');
         return;
       }
     }
+
+    logger.info(`Found raffle: ${raffle.id}, existing winners: ${raffle.winners.length}`);
 
     // Check if winner already selected
     if (raffle.winners.length > 0) {
@@ -646,11 +674,17 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
       `Please wait...`
     );
 
+    logger.info('Importing selectWinner function');
+
     // Import selectWinner function
     const { selectWinner } = await import('../../services/winner-service');
     
+    logger.info('Calling selectWinner');
+
     // Select the winner
     await selectWinner(raffle.id);
+
+    logger.info('Winner selected, fetching winner record');
 
     // Get the selected winner
     const winner = await prisma.winner.findFirst({
@@ -659,6 +693,8 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
     });
 
     if (winner) {
+      logger.info(`Winner confirmation: ${winner.walletAddress}`);
+
       // Build randomness proof section
       let randomnessSection = '';
       if (winner.selectionMethod === 'on-chain' && winner.randomnessEpoch) {
@@ -680,10 +716,11 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
         `ID: \`${raffle.id}\`\n` +
         `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
         `The winner has been announced in the broadcast channel.\n\n` +
-        `Use /award_prize to mark the prize as awarded.`,
+        `Use /award_prize <txhash> to mark the prize as awarded.`,
         { parse_mode: 'Markdown' }
       );
     } else {
+      logger.warn('No winner record found after selection');
       await bot.sendMessage(
         chatId,
         `⚠️ Winner selection completed, but no winner record found.\n\n` +
@@ -693,12 +730,17 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
     }
 
   } catch (error) {
-    logger.error('Error selecting winner:', error);
-    await bot.sendMessage(
-      chatId,
-      '❌ Error selecting winner. Please check the logs and try again.\n\n' +
-      `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
+    logger.error('Error in handleSelectWinner:', error);
+    logger.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    try {
+      await bot.sendMessage(
+        chatId,
+        `❌ Error selecting winner.\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease check the logs and try again.`
+      );
+    } catch (sendError) {
+      logger.error('Failed to send error message:', sendError);
+    }
   }
 }
 
