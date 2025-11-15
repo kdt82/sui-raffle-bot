@@ -524,6 +524,119 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
   }
 }
 
+export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+
+  try {
+    // Get raffle ID from command or use most recent ended raffle
+    const args = msg.text?.split(' ').slice(1);
+    let raffleId = args?.[0];
+
+    let raffle;
+    if (raffleId) {
+      raffle = await prisma.raffle.findUnique({
+        where: { id: raffleId },
+        include: {
+          winners: true,
+        },
+      });
+
+      if (!raffle) {
+        await bot.sendMessage(chatId, '❌ Raffle not found.');
+        return;
+      }
+    } else {
+      // Get most recent ended raffle without a winner
+      raffle = await prisma.raffle.findFirst({
+        where: {
+          status: RAFFLE_STATUS.ENDED,
+        },
+        orderBy: { endTime: 'desc' },
+        include: {
+          winners: true,
+        },
+      });
+
+      if (!raffle) {
+        await bot.sendMessage(chatId, '❌ No ended raffle found that needs a winner.');
+        return;
+      }
+    }
+
+    // Check if winner already selected
+    if (raffle.winners.length > 0) {
+      await bot.sendMessage(
+        chatId,
+        `❌ Winner already selected for this raffle!\n\n` +
+        `Use /winner to view the winner details.`
+      );
+      return;
+    }
+
+    // Check if raffle has ended
+    if (raffle.endTime > new Date() && raffle.status !== RAFFLE_STATUS.ENDED) {
+      await bot.sendMessage(
+        chatId,
+        `❌ Cannot select winner - raffle has not ended yet.\n\n` +
+        `Raffle ends: ${formatDate(raffle.endTime)} UTC\n` +
+        `Current time: ${formatDate(new Date())} UTC`
+      );
+      return;
+    }
+
+    await bot.sendMessage(
+      chatId,
+      `🎲 Selecting winner for raffle...\n\n` +
+      `Raffle ID: ${raffle.id}\n` +
+      `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
+      `Please wait...`
+    );
+
+    // Import selectWinner function
+    const { selectWinner } = await import('../../services/winner-service');
+    
+    // Select the winner
+    await selectWinner(raffle.id);
+
+    // Get the selected winner
+    const winner = await prisma.winner.findFirst({
+      where: { raffleId: raffle.id },
+      orderBy: { selectedAt: 'desc' },
+    });
+
+    if (winner) {
+      await bot.sendMessage(
+        chatId,
+        `🎉 *Winner Selected!*\n\n` +
+        `*Winner Details:*\n` +
+        `Wallet: \`${winner.walletAddress}\`\n` +
+        `Tickets: ${winner.ticketCount.toLocaleString()}\n\n` +
+        `*Raffle Details:*\n` +
+        `ID: \`${raffle.id}\`\n` +
+        `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
+        `The winner has been announced in the broadcast channel.\n\n` +
+        `Use /award_prize to mark the prize as awarded.`,
+        { parse_mode: 'Markdown' }
+      );
+    } else {
+      await bot.sendMessage(
+        chatId,
+        `⚠️ Winner selection completed, but no winner record found.\n\n` +
+        `This may happen if there were no tickets for this raffle.\n` +
+        `Use /winner to check the status.`
+      );
+    }
+
+  } catch (error) {
+    logger.error('Error selecting winner:', error);
+    await bot.sendMessage(
+      chatId,
+      '❌ Error selecting winner. Please check the logs and try again.\n\n' +
+      `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
 export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
   const chatId = msg.chat.id;
 
