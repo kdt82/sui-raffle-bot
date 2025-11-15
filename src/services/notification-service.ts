@@ -225,22 +225,22 @@ Check your tickets: /mytickets
       // Build randomness proof section
       let randomnessSection = '';
       if (winner.selectionMethod === 'on-chain' && winner.randomnessEpoch) {
-        randomnessSection = `\n🔐 *Selection Method:* SUI On-Chain Randomness\n📍 Blockchain Epoch: ${winner.randomnessEpoch}\n`;
+        randomnessSection = `\n🔐 Selection Method: SUI On-Chain Randomness\n📍 Blockchain Epoch: ${winner.randomnessEpoch}\n`;
       } else if (winner.selectionMethod === 'client-side') {
-        randomnessSection = `\n🔐 *Selection Method:* Weighted Random\n`;
+        randomnessSection = `\n🔐 Selection Method: Weighted Random\n`;
       }
 
       // Build transaction section if txHash provided
       let transactionSection = '';
       if (txHash) {
-        transactionSection = `\n\n💰 *Prize Status:* AWARDED ✅\n🔗 [View Transaction](https://suiscan.xyz/mainnet/tx/${txHash})`;
+        transactionSection = `\n\n💰 Prize Status: AWARDED ✅\n🔗 Transaction: https://suiscan.xyz/mainnet/tx/${txHash}`;
       }
 
       // Convert BigInt to string for display
       const ticketCountStr = winner.ticketCount.toString();
 
       const message = `
-🎉 *RAFFLE WINNER ANNOUNCED!*
+🎉 RAFFLE WINNER ANNOUNCED!
 
 🏆 Prize: ${raffle.prizeAmount} ${raffle.prizeType}
 
@@ -256,9 +256,7 @@ Congratulations to the winner! 🎊
       const broadcastChannelId = process.env.TELEGRAM_BROADCAST_CHANNEL_ID;
       if (broadcastChannelId) {
         try {
-          await bot.sendMessage(broadcastChannelId, message, {
-            parse_mode: 'Markdown',
-          });
+          await bot.sendMessage(broadcastChannelId, message);
           logger.info(`Broadcasted winner announcement to channel for raffle ${raffleId}`);
         } catch (error) {
           logger.error(`Failed to broadcast winner announcement to channel:`, error);

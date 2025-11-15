@@ -432,18 +432,18 @@ export async function handleAwardPrize(msg: TelegramBot.Message): Promise<void> 
 
     await bot.sendMessage(
       chatId,
-      `✅ *Prize Marked as Awarded!*\n\n` +
-      `*Raffle Details:*\n` +
+      `✅ PRIZE MARKED AS AWARDED!\n\n` +
+      `RAFFLE DETAILS:\n` +
       `ID: ${endedRaffle.id}\n` +
       `Prize: ${endedRaffle.prizeAmount} ${endedRaffle.prizeType}\n\n` +
-      `*Winner:*\n` +
+      `WINNER:\n` +
       `Wallet: ${winner.walletAddress}\n` +
       `Tickets: ${winner.ticketCount.toString()}\n\n` +
-      `*Transaction:*\n` +
-      `🔗 [View on SuiScan](${suiscanLink})\n` +
+      `TRANSACTION:\n` +
+      `🔗 ${suiscanLink}\n` +
       `Hash: ${txHash}\n\n` +
       `Prize awarded and winner announced to broadcast channel!`,
-      { parse_mode: 'Markdown', disable_web_page_preview: true }
+      { disable_web_page_preview: true }
     );
 
     // AUDIT LOG: Prize awarded (non-blocking)
@@ -553,18 +553,18 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
 
     // Build transaction link if available
     const txSection = winner.awardTxHash
-      ? `\n🔗 [View Transaction](https://suiscan.xyz/mainnet/tx/${winner.awardTxHash})`
+      ? `\n🔗 Transaction: https://suiscan.xyz/mainnet/tx/${winner.awardTxHash}`
       : '';
 
     // Build randomness proof section
     let randomnessSection = '';
     if (winner.selectionMethod === 'on-chain' && winner.randomnessEpoch) {
-      randomnessSection = `\n\n*🔐 Randomness Proof:*\n` +
+      randomnessSection = `\n\n🔐 RANDOMNESS PROOF:\n` +
         `Method: SUI On-Chain Randomness\n` +
         `Blockchain Epoch: ${winner.randomnessEpoch}\n` +
         `This winner was selected using verifiable on-chain randomness from the SUI blockchain.`;
     } else if (winner.selectionMethod === 'client-side') {
-      randomnessSection = `\n\n*🔐 Selection Method:*\n` +
+      randomnessSection = `\n\n🔐 SELECTION METHOD:\n` +
         `Weighted Random (Client-side)`;
     }
 
@@ -572,21 +572,21 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
 
     await bot.sendMessage(
       chatId,
-      `🏆 *Raffle Winner*\n\n` +
-      `${statusEmoji} *Status:* ${winner.prizeAwarded ? 'Prize Awarded' : 'Pending Award'}\n\n` +
-      `*Raffle Details:*\n` +
+      `🏆 RAFFLE WINNER\n\n` +
+      `${statusEmoji} Status: ${winner.prizeAwarded ? 'Prize Awarded' : 'Pending Award'}\n\n` +
+      `RAFFLE DETAILS:\n` +
       `ID: ${raffle.id}\n` +
       `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n` +
       `Ended: ${formatDate(raffle.endTime)} UTC\n\n` +
-      `*Winner Details:*\n` +
+      `WINNER DETAILS:\n` +
       `Wallet: ${winner.walletAddress}\n` +
       `Tickets: ${ticketCountStr} (${winnerPercentage}% of total)\n` +
       `Selected: ${formatDate(winner.selectedAt)} UTC${awardedText}${txSection}${randomnessSection}\n\n` +
-      `*Raffle Stats:*\n` +
+      `RAFFLE STATS:\n` +
       `Total Participants: ${totalParticipants}\n` +
       `Total Tickets: ${totalTickets.toLocaleString()}\n\n` +
       `${!winner.prizeAwarded ? '💡 Use /award_prize <txhash> to mark as awarded' : ''}`,
-      { parse_mode: 'Markdown', disable_web_page_preview: true }
+      { disable_web_page_preview: true }
     );
 
     logger.info('Winner message sent successfully');
@@ -705,11 +705,11 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
       // Build randomness proof section
       let randomnessSection = '';
       if (winner.selectionMethod === 'on-chain' && winner.randomnessEpoch) {
-        randomnessSection = `\n*🔐 Randomness Proof:*\n` +
+        randomnessSection = `\n🔐 Randomness Proof:\n` +
           `Method: SUI On-Chain Randomness\n` +
           `Blockchain Epoch: ${winner.randomnessEpoch}\n\n`;
       } else if (winner.selectionMethod) {
-        randomnessSection = `\n*Selection Method:* ${winner.selectionMethod}\n\n`;
+        randomnessSection = `\nSelection Method: ${winner.selectionMethod}\n\n`;
       }
 
       // Convert BigInt to string for display
@@ -717,16 +717,15 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
 
       await bot.sendMessage(
         chatId,
-        `🎉 *Winner Selected!*\n\n` +
-        `*Winner Details:*\n` +
+        `🎉 WINNER SELECTED!\n\n` +
+        `WINNER DETAILS:\n` +
         `Wallet: ${winner.walletAddress}\n` +
         `Tickets: ${ticketCountStr}\n` +
         randomnessSection +
-        `*Raffle Details:*\n` +
+        `RAFFLE DETAILS:\n` +
         `ID: ${raffle.id}\n` +
         `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
-        `Winner selected privately. Use /award_prize <txhash> to award the prize and announce publicly.`,
-        { parse_mode: 'Markdown' }
+        `Winner selected privately. Use /award_prize <txhash> to award the prize and announce publicly.`
       );
     } else {
       logger.warn('No winner record found after selection');
