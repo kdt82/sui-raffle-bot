@@ -203,7 +203,7 @@ Check your tickets: /mytickets
   /**
    * Broadcast winner announcement
    */
-  async broadcastWinnerAnnouncement(raffleId: string): Promise<void> {
+  async broadcastWinnerAnnouncement(raffleId: string, txHash?: string): Promise<void> {
     try {
       const raffle = await prisma.raffle.findUnique({
         where: { id: raffleId },
@@ -230,6 +230,12 @@ Check your tickets: /mytickets
         randomnessSection = `\n🔐 *Selection Method:* Weighted Random\n`;
       }
 
+      // Build transaction section if txHash provided
+      let transactionSection = '';
+      if (txHash) {
+        transactionSection = `\n\n💰 *Prize Status:* AWARDED ✅\n🔗 [View Transaction](https://suiscan.xyz/mainnet/tx/${txHash})`;
+      }
+
       // Convert BigInt to string for display
       const ticketCountStr = winner.ticketCount.toString();
 
@@ -241,7 +247,8 @@ Check your tickets: /mytickets
 👤 Winner: ${winner.walletAddress.slice(0, 8)}...${winner.walletAddress.slice(-6)}
 🎫 Winning Tickets: ${ticketCountStr} (${winPercentage}% chance)
 📊 Total Participants: ${totalParticipants.toLocaleString()}
-🎟️ Total Tickets: ${totalTickets.toLocaleString()}${randomnessSection}
+🎟️ Total Tickets: ${totalTickets.toLocaleString()}${randomnessSection}${transactionSection}
+
 Congratulations to the winner! 🎊
       `.trim();
 

@@ -65,17 +65,14 @@ export async function selectWinner(raffleId: string): Promise<void> {
     // Track metrics
     trackRaffleEvent('winner_selected');
 
-    // Broadcast winner announcement to main channel only
-    await notificationService.broadcastWinnerAnnouncement(raffleId);
-
-    // Send admin alert (convert BigInt to string for display)
+    // Send admin alert only (no public broadcast until prize is awarded)
     const ticketCountStr = winner.ticketCount.toString();
     await notificationService.sendAdminAlert(
       `🎉 Winner selected!\n\n` +
       `Winner: ${winner.walletAddress.slice(0, 8)}...${winner.walletAddress.slice(-6)}\n` +
       `Tickets: ${ticketCountStr}\n` +
       `Method: ${winner.selectionMethod}\n\n` +
-      `Award the prize using /award_prize <txhash>`
+      `Award the prize using /award_prize <txhash> to broadcast the winner publicly`
     );
 
   } catch (error) {

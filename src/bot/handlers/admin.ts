@@ -6,6 +6,7 @@ import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS, formatDate } from
 import { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
 import { conversationManager } from '../conversation';
 import { auditService } from '../../services/audit-service';
+import { notificationService } from '../../services/notification-service';
 
 // Re-export UI handler
 export { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
@@ -426,19 +427,22 @@ export async function handleAwardPrize(msg: TelegramBot.Message): Promise<void> 
     // Format SuiScan link
     const suiscanLink = `https://suiscan.xyz/mainnet/tx/${txHash}`;
 
+    // Broadcast winner announcement with transaction link
+    await notificationService.broadcastWinnerAnnouncement(endedRaffle.id, txHash);
+
     await bot.sendMessage(
       chatId,
       `✅ *Prize Marked as Awarded!*\n\n` +
       `*Raffle Details:*\n` +
-      `ID: \`${endedRaffle.id}\`\n` +
+      `ID: ${endedRaffle.id}\n` +
       `Prize: ${endedRaffle.prizeAmount} ${endedRaffle.prizeType}\n\n` +
       `*Winner:*\n` +
-      `Wallet: \`${winner.walletAddress}\`\n` +
-      `Tickets: ${winner.ticketCount.toLocaleString()}\n\n` +
+      `Wallet: ${winner.walletAddress}\n` +
+      `Tickets: ${winner.ticketCount.toString()}\n\n` +
       `*Transaction:*\n` +
       `🔗 [View on SuiScan](${suiscanLink})\n` +
-      `Hash: \`${txHash}\`\n\n` +
-      `Prize award recorded. Winner announcement sent to broadcast channel.`,
+      `Hash: ${txHash}\n\n` +
+      `Prize awarded and winner announced to broadcast channel!`,
       { parse_mode: 'Markdown', disable_web_page_preview: true }
     );
 
@@ -721,8 +725,7 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
         `*Raffle Details:*\n` +
         `ID: ${raffle.id}\n` +
         `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
-        `The winner has been announced in the broadcast channel.\n\n` +
-        `Use /award_prize <txhash> to mark the prize as awarded.`,
+        `Winner selected privately. Use /award_prize <txhash> to award the prize and announce publicly.`,
         { parse_mode: 'Markdown' }
       );
     } else {
