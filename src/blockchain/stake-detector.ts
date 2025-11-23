@@ -274,9 +274,13 @@ export class StakeDetector {
                 }
 
                 // Extract wallet address and amount based on stake type
-                const walletAddress = stakeType === 'stake'
+                let walletAddress = stakeType === 'stake'
                     ? (parsed.staker as string)
                     : (parsed.unstaker as string);
+
+                if (walletAddress && !walletAddress.startsWith('0x')) {
+                    walletAddress = '0x' + walletAddress;
+                }
 
                 const amount = parsed.amount as string;
 
@@ -393,7 +397,10 @@ export class StakeDetector {
             }
 
             const amount = parsed.amount;
-            const staker = parsed.staker;
+            let staker = parsed.staker;
+            if (staker && !staker.startsWith('0x')) {
+                staker = '0x' + staker;
+            }
             const timestamp = parseInt(stakeEvent.timestampMs || '0') || Date.now();
 
             const eventData: StakeEventData = {
