@@ -49,7 +49,7 @@ interface MoonbagsUnstakeEvent {
 }
 
 export class StakeDetector {
-    private activeRaffle: { id: string; ca: string; ticketsPerToken?: string | null; stakingBonusPercent?: number | null } | null = null;
+    private activeRaffle: { id: string; ca: string; ticketsPerToken?: string | null; stakingBonusPercent?: number | null; decimals?: number } | null = null;
     private rafflePollInterval: NodeJS.Timeout | null = null;
     private onChainPollInterval: NodeJS.Timeout | null = null;
     private processedEventIds: Set<string> = new Set();
@@ -90,11 +90,31 @@ export class StakeDetector {
                     this.activeRaffle.id !== raffle.id ||
                     this.activeRaffle.ca !== raffle.ca;
 
+                let decimals = 9; // Default to 9 (SUI)
+
+                // If raffle hasn't changed, keep existing decimals to avoid unnecessary RPC calls
+                if (!hasChanged && this.activeRaffle?.decimals) {
+                    decimals = this.activeRaffle.decimals;
+                } else {
+                    // Fetch decimals for new raffle
+                    try {
+                        const client = getSuiClient();
+                        const metadata = await client.getCoinMetadata({ coinType: raffle.ca });
+                        if (metadata?.decimals) {
+                            decimals = metadata.decimals;
+                            logger.info(`Fetched decimals for ${raffle.ca}: ${decimals}`);
+                        }
+                    } catch (error) {
+                        logger.warn(`Failed to fetch decimals for ${raffle.ca}, using default 9:`, error);
+                    }
+                }
+
                 this.activeRaffle = {
                     id: raffle.id,
                     ca: raffle.ca,
                     ticketsPerToken: raffle.ticketsPerToken,
-                    stakingBonusPercent: raffle.stakingBonusPercent
+                    stakingBonusPercent: raffle.stakingBonusPercent,
+                    decimals
                 };
 
                 if (hasChanged) {
@@ -347,7 +367,7 @@ export class StakeDetector {
             const bonusMultiplier = bonusPercent / 100;
 
             const amount = BigInt(data.tokenAmount);
-            const decimals = 9; // SUI standard decimals
+            const decimals = this.activeRaffle?.decimals || 9;
             const scale = BigInt(10) ** BigInt(decimals);
             if (scale === 0n) return 0;
 
