@@ -49,7 +49,7 @@ interface MoonbagsUnstakeEvent {
 }
 
 export class StakeDetector {
-    private activeRaffle: { id: string; ca: string; ticketsPerToken?: string | null } | null = null;
+    private activeRaffle: { id: string; ca: string; ticketsPerToken?: string | null; stakingBonusPercent?: number | null } | null = null;
     private rafflePollInterval: NodeJS.Timeout | null = null;
     private onChainPollInterval: NodeJS.Timeout | null = null;
     private processedEventIds: Set<string> = new Set();
@@ -93,7 +93,8 @@ export class StakeDetector {
                 this.activeRaffle = {
                     id: raffle.id,
                     ca: raffle.ca,
-                    ticketsPerToken: raffle.ticketsPerToken
+                    ticketsPerToken: raffle.ticketsPerToken,
+                    stakingBonusPercent: raffle.stakingBonusPercent
                 };
 
                 if (hasChanged) {
@@ -341,15 +342,18 @@ export class StakeDetector {
                 ? parseFloat(this.activeRaffle.ticketsPerToken)
                 : 100;
 
+            // Use raffle's staking bonus percent, default to 25% if not set
+            const bonusPercent = this.activeRaffle?.stakingBonusPercent ?? 25;
+            const bonusMultiplier = bonusPercent / 100;
+
             const amount = BigInt(data.tokenAmount);
             const decimals = 9; // SUI standard decimals
             const scale = BigInt(10) ** BigInt(decimals);
             if (scale === 0n) return 0;
 
             const PRECISION = 1000000;
-            const BONUS_MULTIPLIER = 0.25; // 25% bonus
             const ratio = Math.floor(ticketsPerToken * PRECISION);
-            const bonusRatio = Math.floor(ratio * BONUS_MULTIPLIER);
+            const bonusRatio = Math.floor(ratio * bonusMultiplier);
             const ratioBig = BigInt(bonusRatio);
             const precisionBig = BigInt(PRECISION);
 

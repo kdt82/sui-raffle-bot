@@ -198,6 +198,9 @@ export async function handleCreateRaffleStep(
     case 'create_raffle_leaderboard_media':
       await handleLeaderboardMediaStep(msg, data);
       break;
+    case 'create_raffle_staking_bonus':
+      await handleStakingBonusStep(msg, data);
+      break;
     case 'create_raffle_randomness_type':
       await handleRandomnessTypeStep(msg, data);
       break;
@@ -839,6 +842,49 @@ async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record
 
   data.leaderboardMediaUrl = mediaFileId;
   data.leaderboardMediaType = mediaType;
+
+  conversationManager.updateConversation(userId, chatId, {
+    step: 'create_raffle_staking_bonus',
+    data,
+  });
+
+  const keyboard: TelegramBot.InlineKeyboardMarkup = {
+    inline_keyboard: [
+      [{ text: '25%', callback_data: 'staking_bonus_25' }, { text: '50%', callback_data: 'staking_bonus_50' }],
+      [{ text: '57%', callback_data: 'staking_bonus_57' }, { text: '✏️ Custom', callback_data: 'staking_bonus_custom' }],
+      [{ text: '⏭️ Skip (No Bonus)', callback_data: 'skip_staking_bonus' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+    ],
+  };
+
+  await bot.sendMessage(
+    chatId,
+    `✅ Leaderboard Media: ${mediaType} attached\n\n` +
+    `Step 11/12: Staking Bonus (Optional)\n\n` +
+    `🎁 Set bonus tickets for users who stake their tokens!\n\n` +
+    `Select a bonus percentage or skip for no staking bonus:`,
+    {
+      reply_markup: keyboard,
+    }
+  );
+}
+
+async function handleRandomnessTypeStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+  // This is handled via callback query for selection
+}
+
+async function handleStakingBonusStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
+  const bonusInput = msg.text?.trim();
+
+  if (!bonusInput || isNaN(parseInt(bonusInput)) || parseInt(bonusInput) <= 0 || parseInt(bonusInput) > 100) {
+    await bot.sendMessage(chatId, '❌ Please send a valid percentage between 1 and 100.');
+    return;
+  }
+
+  const bonusPercent = parseInt(bonusInput);
+  data.stakingBonusPercent = bonusPercent;
   data.randomnessType = 'client-side'; // Default to client-side
 
   conversationManager.updateConversation(userId, chatId, {
@@ -849,9 +895,6 @@ async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record
   await showReviewStep(chatId, data);
 }
 
-async function handleRandomnessTypeStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
-  // This is handled via callback query for selection
-}
 
 async function handleReviewStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
   // This is handled via callback query for confirmation
@@ -898,6 +941,10 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     ? '\nRandomness: ⛓️ On-Chain SUI (Verifiable)'
     : '\nRandomness: 🎲 Client-Side (Default)';
 
+  const stakingBonusText = data.stakingBonusPercent
+    ? `\nStaking Bonus: 🎁 ${data.stakingBonusPercent}% bonus tickets`
+    : '\nStaking Bonus: None';
+
   await bot.sendMessage(
     chatId,
     `📋 **Review Raffle Details**\n\n` +
@@ -905,7 +952,7 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     `DEX: ${dexDisplay}\n` +
     `Prize Type: ${data.prizeType}\n` +
     `Prize Amount: ${data.prizeAmount}\n` +
-    `Ticket Ratio: ${ratioDisplay}${minimumText}${announcementMediaText}${notificationMediaText}${leaderboardMediaText}${randomnessTypeText}\n\n` +
+    `Ticket Ratio: ${ratioDisplay}${minimumText}${announcementMediaText}${notificationMediaText}${leaderboardMediaText}${stakingBonusText}${randomnessTypeText}\n\n` +
     `Please review and confirm:`,
     {
       parse_mode: 'Markdown',
@@ -1128,14 +1175,81 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
     if (callbackData === 'skip_leaderboard_media') {
       conversation.data.leaderboardMediaUrl = null;
       conversation.data.leaderboardMediaType = null;
+
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_staking_bonus',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: 'Skipped leaderboard media' });
+
+      await bot.editMessageText(
+        `✅ Leaderboard Media: None\n\n` +
+        `Step 11/12: Staking Bonus (Optional)\n\n` +
+        `🎁 Set bonus tickets for users who stake their tokens!\n\n` +
+        `Select a bonus percentage or skip for no staking bonus:`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '25%', callback_data: 'staking_bonus_25' }, { text: '50%', callback_data: 'staking_bonus_50' }],
+              [{ text: '57%', callback_data: 'staking_bonus_57' }, { text: '✏️ Custom', callback_data: 'staking_bonus_custom' }],
+              [{ text: '⏭️ Skip (No Bonus)', callback_data: 'skip_staking_bonus' }],
+              [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    // Handle staking bonus selection
+    if (callbackData === 'staking_bonus_25' || callbackData === 'staking_bonus_50' || callbackData === 'staking_bonus_57') {
+      const bonusPercent = callbackData === 'staking_bonus_25' ? 25 : callbackData === 'staking_bonus_50' ? 50 : 57;
+      conversation.data.stakingBonusPercent = bonusPercent;
       conversation.data.randomnessType = 'client-side'; // Default to client-side
 
       conversationManager.updateConversation(userId, chatId, {
         step: 'create_raffle_review',
         data: conversation.data,
       });
-      await bot.answerCallbackQuery(query.id, { text: 'Skipped leaderboard media' });
+      await bot.answerCallbackQuery(query.id, { text: `Set ${bonusPercent}% staking bonus` });
+      await showReviewStep(chatId, conversation.data);
+      return;
+    }
 
+    if (callbackData === 'staking_bonus_custom') {
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_staking_bonus',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: 'Enter custom percentage' });
+      await bot.editMessageText(
+        `Step 11/12: Staking Bonus (Custom)\n\n` +
+        `🎁 Enter a custom bonus percentage (1-100):\n\n` +
+        `Example: Enter "35" for 35% bonus tickets`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔙 Back', callback_data: 'back_to_staking_bonus' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'skip_staking_bonus') {
+      conversation.data.stakingBonusPercent = null;
+      conversation.data.randomnessType = 'client-side'; // Default to client-side
+
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_review',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: 'Skipped staking bonus' });
       await showReviewStep(chatId, conversation.data);
       return;
     }
@@ -1571,6 +1685,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         leaderboardMediaUrl: data.leaderboardMediaUrl || null,
         leaderboardMediaType: data.leaderboardMediaType || null,
         randomnessType: data.randomnessType || 'client-side',
+        stakingBonusPercent: data.stakingBonusPercent || null,
         status: RAFFLE_STATUS.ACTIVE,
         started: isStartingNow, // Mark as started if starting immediately
       },

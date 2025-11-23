@@ -29,6 +29,7 @@ model Raffle {
   leaderboardMediaUrl     String?  // Media for leaderboard display
   leaderboardMediaType    String?  // image, video, gif
   randomnessType String   @default("client-side") // on-chain, client-side - determines winner selection method
+  stakingBonusPercent Int?  @default(25) // Percentage bonus tickets for staking (e.g., 25 for 25%)
   status      String   @default("active") // active, ended, winner_selected
   started     Boolean  @default(false) // Whether start announcement has been sent
   createdAt   DateTime @default(now())
