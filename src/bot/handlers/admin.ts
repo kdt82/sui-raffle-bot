@@ -13,9 +13,23 @@ export { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
 
 export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void> {
   const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
 
   try {
-    // Find active raffle
+    // First check if there's an active conversation (raffle creation in progress)
+    const conversation = conversationManager.getConversation(userId, chatId);
+    if (conversation && conversation.step.startsWith('create_raffle')) {
+      conversationManager.deleteConversation(userId, chatId);
+      await bot.sendMessage(
+        chatId,
+        '❌ Raffle creation cancelled.\n\n' +
+        'Your raffle creation session has been terminated.'
+      );
+      logger.info(`Raffle creation conversation cancelled for user ${userId}`);
+      return;
+    }
+
+    // If no conversation, check for active raffle in database
     const activeRaffle = await prisma.raffle.findFirst({
       where: {
         status: RAFFLE_STATUS.ACTIVE,
@@ -23,11 +37,11 @@ export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void
     });
 
     if (!activeRaffle) {
-      await bot.sendMessage(chatId, '❌ No active raffle to cancel.');
+      await bot.sendMessage(chatId, '❌ There is no active raffle to cancel.');
       return;
     }
 
-    // Update raffle status to ended (or we could add a 'cancelled' status)
+    // Update raffle status to cancelled
     await prisma.raffle.update({
       where: { id: activeRaffle.id },
       data: {
@@ -38,7 +52,7 @@ export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void
 
     await bot.sendMessage(
       chatId,
-      `✅ Raffle Cancelled Successfully!\n\n` +
+      `✅ Active raffle cancelled successfully!\n\n` +
       `Raffle ID: ${activeRaffle.id}\n` +
       `Contract: ${activeRaffle.ca.slice(0, 10)}...${activeRaffle.ca.slice(-6)}\n` +
       `DEX: ${activeRaffle.dex.toUpperCase()}\n` +
@@ -46,7 +60,7 @@ export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void
       `The raffle has been cancelled and buy detection has stopped.`
     );
 
-    logger.info(`Raffle cancelled: ${activeRaffle.id}`);
+    logger.info(`Active raffle cancelled: ${activeRaffle.id}`);
   } catch (error) {
     logger.error('Error cancelling raffle:', error);
     await bot.sendMessage(chatId, '❌ Failed to cancel raffle. Please try again.');
