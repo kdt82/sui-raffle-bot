@@ -112,6 +112,8 @@ export function registerAdminHandlers(): void {
         callbackData === 'skip_announcement_media' ||
         callbackData === 'skip_notification_media' ||
         callbackData === 'skip_leaderboard_media' ||
+        callbackData.startsWith('staking_bonus_') ||
+        callbackData === 'skip_staking_bonus' ||
         callbackData.startsWith('back_to_')) {
         await withCallbackRateLimit(query, 'callback_ui', async () => {
           await requireAdminPrivateCallback(query, async () => {
