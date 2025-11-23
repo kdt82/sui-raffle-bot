@@ -265,9 +265,9 @@ async function handleStartTimeStep(msg: TelegramBot.Message, data: Record<string
   // Parse DD/MM/YYYY HH:mm:ss format
   const dateTimeRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/;
   const match = startTimeStr.match(dateTimeRegex);
-  
+
   logger.info(`Start time regex match result: ${match ? 'SUCCESS' : 'FAILED'}`);
-  
+
   if (!match) {
     await bot.sendMessage(
       chatId,
@@ -281,7 +281,7 @@ async function handleStartTimeStep(msg: TelegramBot.Message, data: Record<string
 
   const [, day, month, year, hours, minutes, seconds] = match;
   logger.info(`Parsed start time values - Day: ${day}, Month: ${month}, Year: ${year}, Time: ${hours}:${minutes}:${seconds}`);
-  
+
   const startTime = new Date(Date.UTC(
     parseInt(year),
     parseInt(month) - 1,
@@ -344,9 +344,9 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
   // Parse DD/MM/YYYY HH:mm:ss format
   const dateTimeRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/;
   const match = endTimeStr.match(dateTimeRegex);
-  
+
   logger.info(`Regex match result: ${match ? 'SUCCESS' : 'FAILED'}`);
-  
+
   if (!match) {
     await bot.sendMessage(
       chatId,
@@ -359,7 +359,7 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
 
   const [, day, month, year, hours, minutes, seconds] = match;
   logger.info(`Parsed values - Day: ${day}, Month: ${month}, Year: ${year}, Time: ${hours}:${minutes}:${seconds}`);
-  
+
   const endTime = new Date(Date.UTC(
     parseInt(year),
     parseInt(month) - 1, // Month is 0-indexed
@@ -380,7 +380,7 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
   const startTime = data.startTime ? new Date(data.startTime) : new Date();
   if (endTime <= startTime) {
     await bot.sendMessage(
-      chatId, 
+      chatId,
       `❌ End time must be after start time.\n\n` +
       `Start time: ${formatDate(startTime)} UTC\n` +
       `Your end time: ${formatDate(endTime)} UTC`
@@ -401,7 +401,7 @@ async function handleEndTimeStep(msg: TelegramBot.Message, data: Record<string, 
 
   // Extract token symbol from contract address
   const extractedToken = extractTokenSymbolFromCA(data.contractAddress);
-  
+
   // Create prize type selection keyboard with extracted token, USDC, and SUI
   const prizeTypes = [extractedToken, 'USDC', 'SUI'];
   const prizeButtons = prizeTypes.map(type => ({
@@ -538,7 +538,7 @@ async function handleMinimumPurchaseStep(msg: TelegramBot.Message, data: Record<
 
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
-      [{ text: '⏭️ Skip Media', callback_data: 'skip_media' }],
+      [{ text: '⏭️ Skip Media', callback_data: 'skip_announcement_media' }],
       [{ text: '🔙 Back', callback_data: 'back_to_minimum_purchase' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
   };
@@ -559,7 +559,7 @@ async function handleMinimumPurchaseStep(msg: TelegramBot.Message, data: Record<
 async function handleAnnouncementMediaStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
   const chatId = msg.chat.id;
   const userId = BigInt(msg.from!.id);
-  
+
   let mediaFileId: string | undefined;
   let mediaType: string | undefined;
 
@@ -633,7 +633,7 @@ async function handleAnnouncementMediaStep(msg: TelegramBot.Message, data: Recor
 
   data.announcementMediaUrl = mediaFileId;
   data.announcementMediaType = mediaType;
-  
+
   conversationManager.updateConversation(userId, chatId, {
     step: 'create_raffle_notification_media',
     data,
@@ -662,7 +662,7 @@ async function handleAnnouncementMediaStep(msg: TelegramBot.Message, data: Recor
 async function handleNotificationMediaStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
   const chatId = msg.chat.id;
   const userId = BigInt(msg.from!.id);
-  
+
   let mediaFileId: string | undefined;
   let mediaType: string | undefined;
 
@@ -736,7 +736,7 @@ async function handleNotificationMediaStep(msg: TelegramBot.Message, data: Recor
 
   data.notificationMediaUrl = mediaFileId;
   data.notificationMediaType = mediaType;
-  
+
   conversationManager.updateConversation(userId, chatId, {
     step: 'create_raffle_leaderboard_media',
     data,
@@ -765,7 +765,7 @@ async function handleNotificationMediaStep(msg: TelegramBot.Message, data: Recor
 async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
   const chatId = msg.chat.id;
   const userId = BigInt(msg.from!.id);
-  
+
   let mediaFileId: string | undefined;
   let mediaType: string | undefined;
 
@@ -839,35 +839,14 @@ async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record
 
   data.leaderboardMediaUrl = mediaFileId;
   data.leaderboardMediaType = mediaType;
-  
+  data.randomnessType = 'client-side'; // Default to client-side
+
   conversationManager.updateConversation(userId, chatId, {
-    step: 'create_raffle_randomness_type',
+    step: 'create_raffle_review',
     data,
   });
 
-  const keyboard: TelegramBot.InlineKeyboardMarkup = {
-    inline_keyboard: [
-      [
-        { text: '🎲 Client-Side (Default)', callback_data: 'select_randomness_client' },
-        { text: '⛓️ On-Chain SUI', callback_data: 'select_randomness_onchain' }
-      ],
-      [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
-    ],
-  };
-
-  await bot.sendMessage(
-    chatId,
-    `✅ Leaderboard Media: ${mediaType} attached\n\n` +
-    `Step 11/12: Randomness Type\n\n` +
-    `🎲 Choose how the winner will be selected:\n\n` +
-    `• **Client-Side**: Fast, uses standard randomness (default)\n` +
-    `• **On-Chain SUI**: Uses SUI blockchain randomness for verifiable fairness\n\n` +
-    `Select randomness type:`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: keyboard,
-    }
-  );
+  await showReviewStep(chatId, data);
 }
 
 async function handleRandomnessTypeStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
@@ -882,13 +861,13 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
       [{ text: '✅ Confirm & Create', callback_data: 'confirm_create_raffle' }],
-      [{ text: '🔙 Back', callback_data: 'back_to_randomness_type' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
   };
 
   const dexValue = typeof data.dex === 'string' && data.dex.length > 0 ? data.dex : DEFAULT_DEX;
   const dexDisplay = getDexDisplayName(dexValue as DexType).toUpperCase();
-  
+
   // Format ticket ratio for display
   const ratio = parseFloat(data.ticketsPerToken || '100');
   let ratioDisplay;
@@ -898,24 +877,24 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     const tokensPerTicket = Math.round(1 / ratio);
     ratioDisplay = `1 ticket per ${tokensPerTicket.toLocaleString()} tokens`;
   }
-  
-  const minimumText = data.minimumPurchase 
-    ? `\nMinimum Purchase: ${data.minimumPurchase} tokens` 
+
+  const minimumText = data.minimumPurchase
+    ? `\nMinimum Purchase: ${data.minimumPurchase} tokens`
     : '\nMinimum Purchase: None';
-    
+
   const announcementMediaText = data.announcementMediaUrl && data.announcementMediaType
     ? `\nAnnouncement Media: ${data.announcementMediaType} attached`
     : '\nAnnouncement Media: None';
-    
+
   const notificationMediaText = data.notificationMediaUrl && data.notificationMediaType
     ? `\nNotification Media: ${data.notificationMediaType} attached`
     : '\nNotification Media: None';
-    
+
   const leaderboardMediaText = data.leaderboardMediaUrl && data.leaderboardMediaType
     ? `\nLeaderboard Media: ${data.leaderboardMediaType} attached`
     : '\nLeaderboard Media: None';
-    
-  const randomnessTypeText = data.randomnessType === 'on-chain' 
+
+  const randomnessTypeText = data.randomnessType === 'on-chain'
     ? '\nRandomness: ⛓️ On-Chain SUI (Verifiable)'
     : '\nRandomness: 🎲 Client-Side (Default)';
 
@@ -1000,7 +979,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id, { text: 'Starting now' });
-      
+
       // Format UTC time for display
       const formattedNow = now.toLocaleString('en-US', {
         weekday: 'short',
@@ -1013,7 +992,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         timeZone: 'UTC',
         timeZoneName: 'short'
       });
-      
+
       await bot.editMessageText(
         `✅ Start Time: ${formattedNow}\n\n` +
         `Step 3/7: End Time\n\n` +
@@ -1149,36 +1128,15 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
     if (callbackData === 'skip_leaderboard_media') {
       conversation.data.leaderboardMediaUrl = null;
       conversation.data.leaderboardMediaType = null;
+      conversation.data.randomnessType = 'client-side'; // Default to client-side
+
       conversationManager.updateConversation(userId, chatId, {
-        step: 'create_raffle_randomness_type',
+        step: 'create_raffle_review',
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id, { text: 'Skipped leaderboard media' });
-      
-      const keyboard: TelegramBot.InlineKeyboardMarkup = {
-        inline_keyboard: [
-          [
-            { text: '🎲 Client-Side (Default)', callback_data: 'select_randomness_client' },
-            { text: '⛓️ On-Chain SUI', callback_data: 'select_randomness_onchain' }
-          ],
-          [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
-        ],
-      };
 
-      await bot.editMessageText(
-        `✅ Leaderboard Media: None\n\n` +
-        `Step 11/12: Randomness Type\n\n` +
-        `🎲 Choose how the winner will be selected:\n\n` +
-        `• **Client-Side**: Fast, uses standard randomness (default)\n` +
-        `• **On-Chain SUI**: Uses SUI blockchain randomness for verifiable fairness\n\n` +
-        `Select randomness type:`,
-        {
-          chat_id: chatId,
-          message_id: query.message!.message_id,
-          parse_mode: 'Markdown',
-          reply_markup: keyboard,
-        }
-      );
+      await showReviewStep(chatId, conversation.data);
       return;
     }
 
@@ -1232,7 +1190,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
-      
+
       // Get current UTC time (to nearest minute)
       const now = new Date();
       const currentUtc = now.toLocaleString('en-US', {
@@ -1244,7 +1202,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         timeZone: 'UTC',
         hour12: false
       });
-      
+
       await bot.editMessageText(
         `✅ Contract Address: \`${conversation.data.contractAddress}\`\n\n` +
         `Step 2/11: Start Time\n\n` +
@@ -1273,21 +1231,21 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
-      
-      const startTimeDisplay = conversation.data.startTime 
+
+      const startTimeDisplay = conversation.data.startTime
         ? new Date(conversation.data.startTime).toLocaleString('en-US', {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            timeZone: 'UTC',
-            timeZoneName: 'short'
-          })
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          timeZone: 'UTC',
+          timeZoneName: 'short'
+        })
         : 'Now';
-      
+
       // Get current UTC time (to nearest minute)
       const now = new Date();
       const currentUtc = now.toLocaleString('en-US', {
@@ -1299,7 +1257,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         timeZone: 'UTC',
         hour12: false
       });
-      
+
       await bot.editMessageText(
         `✅ Start Time: ${startTimeDisplay}\n\n` +
         `Step 3/11: End Time\n\n` +
@@ -1326,7 +1284,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
-      
+
       // Extract token symbol from contract address
       const extractedToken = extractTokenSymbolFromCA(conversation.data.contractAddress);
       const prizeTypes = [extractedToken, 'USDC', 'SUI'];
@@ -1334,7 +1292,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         text: type,
         callback_data: `select_prize_type_${type}`,
       }));
-      
+
       await bot.editMessageText(
         `✅ End Time: ${new Date(conversation.data.endTime).toLocaleString('en-US', {
           weekday: 'short',
@@ -1420,7 +1378,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
-      
+
       // Format ticket ratio for display
       const ratio = parseFloat(conversation.data.ticketsPerToken || '100');
       let ratioDisplay;
@@ -1430,7 +1388,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         const tokensPerTicket = Math.round(1 / ratio);
         ratioDisplay = `1 ticket per ${tokensPerTicket.toLocaleString()} tokens`;
       }
-      
+
       await bot.editMessageText(
         `✅ Ticket Ratio: ${ratioDisplay}\n\n` +
         `Step 7/11: Minimum Purchase (Optional)\n\n` +
@@ -1460,11 +1418,11 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
-      
+
       const minimumText = conversation.data.minimumPurchase
         ? `${conversation.data.minimumPurchase} tokens`
         : 'None';
-      
+
       await bot.editMessageText(
         `✅ Minimum Purchase: ${minimumText}\n\n` +
         `Step 8/11: Announcement Media (Optional)\n\n` +
@@ -1491,11 +1449,11 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
-      
+
       const minimumText = conversation.data.minimumPurchase
         ? `${conversation.data.minimumPurchase} tokens`
         : 'None';
-      
+
       await bot.editMessageText(
         `✅ Minimum Purchase: ${minimumText}\n\n` +
         `Step 8/11: Announcement Media (Optional)\n\n` +
@@ -1522,11 +1480,11 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
-      
+
       const announcementMediaText = conversation.data.announcementMediaUrl
         ? `${conversation.data.announcementMediaType} attached`
         : 'None';
-      
+
       await bot.editMessageText(
         `✅ Announcement Media: ${announcementMediaText}\n\n` +
         `Step 9/11: Notification Media (Optional)\n\n` +
@@ -1553,11 +1511,11 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id);
-      
+
       const notificationMediaText = conversation.data.notificationMediaUrl
         ? `${conversation.data.notificationMediaType} attached`
         : 'None';
-      
+
       await bot.editMessageText(
         `✅ Notification Media: ${notificationMediaText}\n\n` +
         `Step 10/11: Leaderboard Media (Optional)\n\n` +
@@ -1578,48 +1536,12 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       return;
     }
 
-    if (callbackData === 'back_to_randomness_type') {
-      conversationManager.updateConversation(userId, chatId, {
-        step: 'create_raffle_randomness_type',
-        data: conversation.data,
-      });
-      await bot.answerCallbackQuery(query.id);
-      
-      const leaderboardMediaText = conversation.data.leaderboardMediaUrl
-        ? `${conversation.data.leaderboardMediaType} attached`
-        : 'None';
-      
-      const keyboard: TelegramBot.InlineKeyboardMarkup = {
-        inline_keyboard: [
-          [
-            { text: '🎲 Client-Side (Default)', callback_data: 'select_randomness_client' },
-            { text: '⛓️ On-Chain SUI', callback_data: 'select_randomness_onchain' }
-          ],
-          [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
-        ],
-      };
-
-      await bot.editMessageText(
-        `✅ Leaderboard Media: ${leaderboardMediaText}\n\n` +
-        `Step 11/12: Randomness Type\n\n` +
-        `🎲 Choose how the winner will be selected:\n\n` +
-        `• **Client-Side**: Fast, uses standard randomness (default)\n` +
-        `• **On-Chain SUI**: Uses SUI blockchain randomness for verifiable fairness\n\n` +
-        `Select randomness type:`,
-        {
-          chat_id: chatId,
-          message_id: query.message!.message_id,
-          parse_mode: 'Markdown',
-          reply_markup: keyboard,
-        }
-      );
-      return;
-    }
   } catch (error) {
     logger.error('Error handling callback query:', error);
     await bot.answerCallbackQuery(query.id, { text: 'Error processing request' });
   }
 }
+
 
 async function createRaffleFromData(chatId: number, data: Record<string, any>): Promise<void> {
   try {
@@ -1671,8 +1593,8 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       ratioDisplay = `1 ticket per ${tokensPerTicket.toLocaleString()} tokens`;
     }
 
-    const minimumText = raffle.minimumPurchase 
-      ? `\nMinimum Purchase: ${raffle.minimumPurchase} tokens` 
+    const minimumText = raffle.minimumPurchase
+      ? `\nMinimum Purchase: ${raffle.minimumPurchase} tokens`
       : '';
 
     // Send confirmation to admin
@@ -1693,7 +1615,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
     if (MAIN_CHAT_ID) {
       try {
         logger.info(`Attempting to send raffle announcement to MAIN_CHAT_ID: ${MAIN_CHAT_ID}`);
-        
+
         const minimumPurchaseText = raffle.minimumPurchase
           ? `\n\n🎫 **Minimum Purchase for Eligibility:** ${raffle.minimumPurchase} tokens`
           : '';
@@ -1725,9 +1647,9 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         // Send with media if available
         if (raffle.announcementMediaUrl && raffle.announcementMediaType) {
           logger.info(`Sending announcement with media type: ${raffle.announcementMediaType}`);
-          
+
           let sentSuccessfully = false;
-          
+
           // Try to send as photo/video/animation first
           if (raffle.announcementMediaType === 'image') {
             try {
@@ -1775,7 +1697,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
             });
             sentSuccessfully = true;
           }
-          
+
           if (!sentSuccessfully) {
             throw new Error('Failed to send announcement media');
           }
