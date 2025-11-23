@@ -37,13 +37,13 @@ export function formatDate(date: Date): string {
   const suffix = getDaySuffix(day);
   const month = date.toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
   const year = date.getUTCFullYear();
-  const time = date.toLocaleString('en-GB', { 
-    hour: '2-digit', 
-    minute: '2-digit', 
+  const time = date.toLocaleString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
     hour12: true,
-    timeZone: 'UTC' 
+    timeZone: 'UTC'
   });
-  
+
   return `${day}${suffix} ${month} ${year}, ${time}`;
 }
 
@@ -56,7 +56,7 @@ export function formatDateShort(date: Date): string {
   const year = date.getUTCFullYear();
   const hours = String(date.getUTCHours()).padStart(2, '0');
   const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-  
+
   return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
 
@@ -94,3 +94,11 @@ export function getDexDisplayName(dex: DexType): string {
 
 // Main chat ID for raffle announcements
 export const MAIN_CHAT_ID = process.env.MAIN_CHAT_ID || '';
+
+// Staking constants for Moonbags integration
+export const STAKE_BONUS_MULTIPLIER = 0.25; // 25% bonus tickets for staking
+export const STAKE_POLL_INTERVAL_MS = 10000; // Poll every 10 seconds
+export const MOONBAGS_STAKE_PACKAGE = '0x9bc9ddc5cd0220ef810489c73e770f8587a8aa09cad064a0d8e0d1ad903a9e0f';
+export const MOONBAGS_STAKE_EVENT = '0x8f70ad5db84e1a99b542f86ccfb1a932ca7ba010a2fa12a1504d839ff4c111c6::moonbags_stake::StakeEvent';
+export const MOONBAGS_UNSTAKE_EVENT = '0x8f70ad5db84e1a99b542f86ccfb1a932ca7ba010a2fa12a1504d839ff4c111c6::moonbags_stake::UnstakeEvent';
+

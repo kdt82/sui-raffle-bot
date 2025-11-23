@@ -5,8 +5,10 @@ import { logger } from './utils/logger';
 import { registerUserHandlers, registerAdminHandlers } from './bot/handlers';
 import { buyDetector } from './blockchain/buy-detector';
 import { sellDetector } from './blockchain/sell-detector';
+import { stakeDetector } from './blockchain/stake-detector';
 import { startTicketWorker, stopTicketWorker } from './workers/ticket-worker';
 import { startSellWorker, stopSellWorker } from './workers/sell-worker';
+import { startStakeWorker, stopStakeWorker } from './workers/stake-worker';
 import { startRaffleManager, stopRaffleManager } from './services/raffle-service';
 import { setupNotificationJobs } from './workers/notification-worker';
 import { setupAnalyticsJobs } from './workers/analytics-worker';
@@ -46,6 +48,12 @@ async function start(): Promise<void> {
     // Start sell worker
     startSellWorker();
 
+    // Start stake detector
+    await stakeDetector.start();
+
+    // Start stake worker
+    startStakeWorker();
+
     // Start raffle manager
     startRaffleManager();
 
@@ -74,8 +82,10 @@ async function shutdown(): Promise<void> {
   try {
     await buyDetector.stop();
     await sellDetector.stop();
+    await stakeDetector.stop();
     await stopTicketWorker();
     await stopSellWorker();
+    await stopStakeWorker();
     stopRaffleManager();
     await closeRedis();
     await disconnectDatabase();

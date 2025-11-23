@@ -37,6 +37,7 @@ model Raffle {
   tickets   Ticket[]
   buyEvents BuyEvent[]
   sellEvents SellEvent[]
+  stakeEvents StakeEvent[]
   winners   Winner[]
 
   @@index([status])
@@ -95,6 +96,29 @@ model SellEvent {
   @@index([transactionHash])
   @@index([processed])
 }
+
+model StakeEvent {
+  id              String   @id @default(cuid())
+  raffleId        String
+  walletAddress   String
+  tokenAmount     String   // Raw amount from event
+  stakeType       String   // 'stake' or 'unstake'
+  ticketsAdjusted Int      // Bonus tickets added (+) or removed (-)
+  transactionHash String   @unique
+  stakingPool     String?  // Moonbags staking pool ID
+  stakingAccount  String?  // Moonbags staking account ID
+  timestamp       DateTime @default(now())
+  processed       Boolean  @default(false)
+  
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  
+  @@index([raffleId])
+  @@index([walletAddress])
+  @@index([transactionHash])
+  @@index([processed])
+  @@index([stakeType])
+}
+
 
 model WalletUser {
   walletAddress   String   @id
