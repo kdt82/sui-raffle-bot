@@ -100,10 +100,18 @@ async function selectWinnerWithRandomness(
   raffleId: string,
   tickets: TicketWithWeight[]
 ): Promise<WinnerResult> {
+  // Get raffle to check randomness type preference
+  const raffle = await prisma.raffle.findUnique({
+    where: { id: raffleId },
+    select: { randomnessType: true },
+  });
+
+  const useOnChain = raffle?.randomnessType === 'on-chain';
+
   try {
-    // Try to use on-chain randomness if configured
-    if (suiRandomnessService.isConfigured()) {
-      logger.info(`Using SUI on-chain randomness for raffle ${raffleId}`);
+    // Try to use on-chain randomness if configured AND the raffle requests it
+    if (useOnChain && suiRandomnessService.isConfigured()) {
+      logger.info(`Using SUI on-chain randomness for raffle ${raffleId} (raffle preference: ${raffle?.randomnessType})`);
       
       const weights = tickets.map(t => t.ticketCount);
       const { index: selectedIndex, winningTicket } = await suiRandomnessService.generateWeightedRandom(
@@ -125,7 +133,11 @@ async function selectWinnerWithRandomness(
         winningTicketNumber: winningTicket,
       };
     } else {
-      logger.info(`Using client-side randomness for raffle ${raffleId} (on-chain not configured)`);
+      if (useOnChain) {
+        logger.warn(`Raffle ${raffleId} requested on-chain randomness but it's not configured. Falling back to client-side.`);
+      } else {
+        logger.info(`Using client-side randomness for raffle ${raffleId} (raffle preference: ${raffle?.randomnessType || 'not set'})`);
+      }
       
       const weights = tickets.map(t => t.ticketCount);
       const { index: selectedIndex, winningTicket } = clientSideWeightedRandom(weights);
@@ -137,7 +149,7 @@ async function selectWinnerWithRandomness(
       };
     }
   } catch (error) {
-    logger.error('Error with on-chain randomness, falling back to client-side:', error);
+    logger.error('Error with randomness selection, falling back to client-side:', error);
     
     // Fallback to client-side randomness
     const weights = tickets.map(t => t.ticketCount);

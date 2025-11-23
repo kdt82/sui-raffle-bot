@@ -28,6 +28,7 @@ model Raffle {
   notificationMediaType   String?  // image, video, gif
   leaderboardMediaUrl     String?  // Media for leaderboard display
   leaderboardMediaType    String?  // image, video, gif
+  randomnessType String   @default("client-side") // on-chain, client-side - determines winner selection method
   status      String   @default("active") // active, ended, winner_selected
   started     Boolean  @default(false) // Whether start announcement has been sent
   createdAt   DateTime @default(now())
@@ -35,6 +36,7 @@ model Raffle {
 
   tickets   Ticket[]
   buyEvents BuyEvent[]
+  sellEvents SellEvent[]
   winners   Winner[]
 
   @@index([status])
@@ -64,6 +66,24 @@ model BuyEvent {
   walletAddress String
   tokenAmount   String   // Token amount purchased
   ticketCount   Int      // Calculated: tokenAmount * 100
+  transactionHash String @unique
+  timestamp     DateTime @default(now())
+  processed     Boolean  @default(false)
+
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+
+  @@index([raffleId])
+  @@index([walletAddress])
+  @@index([transactionHash])
+  @@index([processed])
+}
+
+model SellEvent {
+  id            String   @id @default(cuid())
+  raffleId      String
+  walletAddress String
+  tokenAmount   String   // Token amount sold
+  ticketsRemoved Int     // Calculated: tokenAmount * ratio
   transactionHash String @unique
   timestamp     DateTime @default(now())
   processed     Boolean  @default(false)

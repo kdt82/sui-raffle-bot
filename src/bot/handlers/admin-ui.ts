@@ -198,6 +198,9 @@ export async function handleCreateRaffleStep(
     case 'create_raffle_leaderboard_media':
       await handleLeaderboardMediaStep(msg, data);
       break;
+    case 'create_raffle_randomness_type':
+      await handleRandomnessTypeStep(msg, data);
+      break;
     case 'create_raffle_review':
       await handleReviewStep(msg, data);
       break;
@@ -838,11 +841,37 @@ async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record
   data.leaderboardMediaType = mediaType;
   
   conversationManager.updateConversation(userId, chatId, {
-    step: 'create_raffle_review',
+    step: 'create_raffle_randomness_type',
     data,
   });
 
-  await showReviewStep(chatId, data);
+  const keyboard: TelegramBot.InlineKeyboardMarkup = {
+    inline_keyboard: [
+      [
+        { text: '🎲 Client-Side (Default)', callback_data: 'select_randomness_client' },
+        { text: '⛓️ On-Chain SUI', callback_data: 'select_randomness_onchain' }
+      ],
+      [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+    ],
+  };
+
+  await bot.sendMessage(
+    chatId,
+    `✅ Leaderboard Media: ${mediaType} attached\n\n` +
+    `Step 11/12: Randomness Type\n\n` +
+    `🎲 Choose how the winner will be selected:\n\n` +
+    `• **Client-Side**: Fast, uses standard randomness (default)\n` +
+    `• **On-Chain SUI**: Uses SUI blockchain randomness for verifiable fairness\n\n` +
+    `Select randomness type:`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard,
+    }
+  );
+}
+
+async function handleRandomnessTypeStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
+  // This is handled via callback query for selection
 }
 
 async function handleReviewStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
@@ -853,7 +882,7 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
       [{ text: '✅ Confirm & Create', callback_data: 'confirm_create_raffle' }],
-      [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+      [{ text: '🔙 Back', callback_data: 'back_to_randomness_type' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
   };
 
@@ -885,6 +914,10 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
   const leaderboardMediaText = data.leaderboardMediaUrl && data.leaderboardMediaType
     ? `\nLeaderboard Media: ${data.leaderboardMediaType} attached`
     : '\nLeaderboard Media: None';
+    
+  const randomnessTypeText = data.randomnessType === 'on-chain' 
+    ? '\nRandomness: ⛓️ On-Chain SUI (Verifiable)'
+    : '\nRandomness: 🎲 Client-Side (Default)';
 
   await bot.sendMessage(
     chatId,
@@ -893,7 +926,7 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     `DEX: ${dexDisplay}\n` +
     `Prize Type: ${data.prizeType}\n` +
     `Prize Amount: ${data.prizeAmount}\n` +
-    `Ticket Ratio: ${ratioDisplay}${minimumText}${announcementMediaText}${notificationMediaText}${leaderboardMediaText}\n\n` +
+    `Ticket Ratio: ${ratioDisplay}${minimumText}${announcementMediaText}${notificationMediaText}${leaderboardMediaText}${randomnessTypeText}\n\n` +
     `Please review and confirm:`,
     {
       parse_mode: 'Markdown',
@@ -1117,10 +1150,46 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       conversation.data.leaderboardMediaUrl = null;
       conversation.data.leaderboardMediaType = null;
       conversationManager.updateConversation(userId, chatId, {
-        step: 'create_raffle_review',
+        step: 'create_raffle_randomness_type',
         data: conversation.data,
       });
       await bot.answerCallbackQuery(query.id, { text: 'Skipped leaderboard media' });
+      
+      const keyboard: TelegramBot.InlineKeyboardMarkup = {
+        inline_keyboard: [
+          [
+            { text: '🎲 Client-Side (Default)', callback_data: 'select_randomness_client' },
+            { text: '⛓️ On-Chain SUI', callback_data: 'select_randomness_onchain' }
+          ],
+          [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+        ],
+      };
+
+      await bot.editMessageText(
+        `✅ Leaderboard Media: None\n\n` +
+        `Step 11/12: Randomness Type\n\n` +
+        `🎲 Choose how the winner will be selected:\n\n` +
+        `• **Client-Side**: Fast, uses standard randomness (default)\n` +
+        `• **On-Chain SUI**: Uses SUI blockchain randomness for verifiable fairness\n\n` +
+        `Select randomness type:`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: keyboard,
+        }
+      );
+      return;
+    }
+
+    if (callbackData === 'select_randomness_client' || callbackData === 'select_randomness_onchain') {
+      const randomnessType = callbackData === 'select_randomness_onchain' ? 'on-chain' : 'client-side';
+      conversation.data.randomnessType = randomnessType;
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_review',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id, { text: `Selected ${randomnessType} randomness` });
       await showReviewStep(chatId, conversation.data);
       return;
     }
@@ -1508,6 +1577,44 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       );
       return;
     }
+
+    if (callbackData === 'back_to_randomness_type') {
+      conversationManager.updateConversation(userId, chatId, {
+        step: 'create_raffle_randomness_type',
+        data: conversation.data,
+      });
+      await bot.answerCallbackQuery(query.id);
+      
+      const leaderboardMediaText = conversation.data.leaderboardMediaUrl
+        ? `${conversation.data.leaderboardMediaType} attached`
+        : 'None';
+      
+      const keyboard: TelegramBot.InlineKeyboardMarkup = {
+        inline_keyboard: [
+          [
+            { text: '🎲 Client-Side (Default)', callback_data: 'select_randomness_client' },
+            { text: '⛓️ On-Chain SUI', callback_data: 'select_randomness_onchain' }
+          ],
+          [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
+        ],
+      };
+
+      await bot.editMessageText(
+        `✅ Leaderboard Media: ${leaderboardMediaText}\n\n` +
+        `Step 11/12: Randomness Type\n\n` +
+        `🎲 Choose how the winner will be selected:\n\n` +
+        `• **Client-Side**: Fast, uses standard randomness (default)\n` +
+        `• **On-Chain SUI**: Uses SUI blockchain randomness for verifiable fairness\n\n` +
+        `Select randomness type:`,
+        {
+          chat_id: chatId,
+          message_id: query.message!.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: keyboard,
+        }
+      );
+      return;
+    }
   } catch (error) {
     logger.error('Error handling callback query:', error);
     await bot.answerCallbackQuery(query.id, { text: 'Error processing request' });
@@ -1541,6 +1648,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         notificationMediaType: data.notificationMediaType || null,
         leaderboardMediaUrl: data.leaderboardMediaUrl || null,
         leaderboardMediaType: data.leaderboardMediaType || null,
+        randomnessType: data.randomnessType || 'client-side',
         status: RAFFLE_STATUS.ACTIVE,
         started: isStartingNow, // Mark as started if starting immediately
       },
