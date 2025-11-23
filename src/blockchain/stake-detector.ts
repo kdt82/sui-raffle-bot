@@ -19,7 +19,7 @@ export function getStakeEventsQueue(): Queue {
     return stakeEventsQueue;
 }
 
-interface StakeEventData {
+export interface StakeEventData {
     walletAddress: string;
     tokenAmount: string;
     transactionHash: string;
@@ -353,6 +353,101 @@ export class StakeDetector {
             logger.info(`${data.stakeType} event queued: ${stakeEvent.id}, ${data.stakeType === 'stake' ? '+' : '-'}${stakeEvent.ticketsAdjusted} tickets`);
         } catch (error) {
             logger.error('Error processing stake event:', error);
+        }
+    }
+
+    public async verifyAndBackfillStake(txHash: string): Promise<{ success: boolean; message: string; ticketsAdded?: number; wallet?: string }> {
+        if (!this.activeRaffle) {
+            return { success: false, message: 'No active raffle' };
+        }
+
+        const client = getSuiClient();
+        try {
+            const tx = await client.getTransactionBlock({
+                digest: txHash,
+                options: { showEvents: true }
+            });
+
+            if (!tx.events || tx.events.length === 0) {
+                return { success: false, message: 'No events found in transaction' };
+            }
+
+            // Find stake event
+            const stakeEvent = tx.events.find(e =>
+                e.type.includes('::moonbags_stake::StakeEvent')
+            );
+
+            if (!stakeEvent) {
+                return { success: false, message: 'No Moonbags stake event found' };
+            }
+
+            const parsed = stakeEvent.parsedJson as any;
+            const tokenAddress = parsed.token_address;
+
+            // Validate token address
+            const normalizedToken = tokenAddress.toLowerCase().replace(/^0x/, '');
+            const normalizedRaffleCA = this.activeRaffle.ca.toLowerCase().replace(/^0x/, '');
+
+            if (!normalizedToken.includes(normalizedRaffleCA)) {
+                return { success: false, message: `Token mismatch. Event: ${tokenAddress}, Raffle: ${this.activeRaffle.ca}` };
+            }
+
+            const amount = parsed.amount;
+            const staker = parsed.staker;
+            const timestamp = parseInt(stakeEvent.timestampMs || '0') || Date.now();
+
+            const eventData: StakeEventData = {
+                walletAddress: staker,
+                tokenAmount: amount,
+                transactionHash: `${txHash}:${stakeEvent.id.eventSeq}`,
+                timestamp: new Date(timestamp),
+                stakeType: 'stake',
+                stakingPool: parsed.staking_pool,
+                stakingAccount: parsed.staking_account
+            };
+
+            // Calculate correct tickets
+            const correctTickets = this.calculateTicketAdjustment(eventData);
+
+            // Check if exists
+            const existing = await prisma.stakeEvent.findUnique({
+                where: { transactionHash: eventData.transactionHash }
+            });
+
+            if (existing) {
+                if (existing.ticketsAdjusted < correctTickets) {
+                    const diff = correctTickets - existing.ticketsAdjusted;
+
+                    // Update existing record
+                    await prisma.stakeEvent.update({
+                        where: { id: existing.id },
+                        data: { ticketsAdjusted: correctTickets }
+                    });
+
+                    // Queue adjustment for the difference
+                    const queue = getStakeEventsQueue();
+                    await queue.add('adjust-tickets', {
+                        stakeEventId: existing.id,
+                        raffleId: existing.raffleId,
+                        walletAddress: existing.walletAddress,
+                        tokenAmount: existing.tokenAmount,
+                        ticketsAdjusted: diff, // Only add the difference
+                        stakeType: 'stake'
+                    });
+
+                    return { success: true, message: `Backfilled ${diff} tickets (Total: ${correctTickets})`, ticketsAdded: diff, wallet: staker };
+                } else {
+                    return { success: false, message: `Event already processed with ${existing.ticketsAdjusted} tickets. Correct is ${correctTickets}.` };
+                }
+            } else {
+                // Create new
+                await this.processStakeEvent(eventData);
+                return { success: true, message: `Processed new stake event. Awarded ${correctTickets} tickets.`, ticketsAdded: correctTickets, wallet: staker };
+            }
+
+        } catch (error: any) {
+            logger.error('Error verifying stake:', error);
+            return { success: false, message: `Error: ${error.message}` };
         }
     }
 

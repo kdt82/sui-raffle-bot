@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand, handleWalletStatusCommand, handleUnlinkWalletCommand, handleMyIdCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleSelectWinner, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets, handleBackfillTicketNumber, handleStartRaffle, handleEndRaffle } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleSelectWinner, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets, handleBackfillTicketNumber, handleStartRaffle, handleEndRaffle, handleVerifyStakeCommand } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
@@ -161,6 +161,16 @@ export function registerAdminHandlers(): void {
         await handleCancelRaffle(msg);
       } catch (error) {
         logger.error('Error handling /cancel_raffle command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/verify_stake/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleVerifyStakeCommand(msg);
+      } catch (error) {
+        logger.error('Error handling /verify_stake command:', error);
       }
     });
   });

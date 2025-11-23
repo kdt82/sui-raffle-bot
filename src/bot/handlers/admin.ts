@@ -10,6 +10,49 @@ import { notificationService } from '../../services/notification-service';
 
 // Re-export UI handler
 export { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
+import { stakeDetector } from '../../blockchain/stake-detector';
+import { MAIN_CHAT_ID } from '../../utils/constants';
+
+export async function handleVerifyStakeCommand(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = BigInt(msg.from!.id);
+  const args = msg.text?.split(' ').slice(1) || [];
+
+  if (args.length === 0) {
+    await bot.sendMessage(chatId, '📝 Usage: /verify_stake <tx_hash>');
+    return;
+  }
+
+  const txHash = args[0].trim();
+  await bot.sendMessage(chatId, `🔍 Verifying stake transaction: ${txHash}...`);
+
+  try {
+    const result = await stakeDetector.verifyAndBackfillStake(txHash);
+
+    if (result.success) {
+      await bot.sendMessage(chatId, `✅ Success: ${result.message}`);
+
+      if (result.ticketsAdded && result.ticketsAdded > 0 && result.wallet) {
+        // Send announcement to main chat
+        if (MAIN_CHAT_ID) {
+          const shortWallet = `${result.wallet.slice(0, 6)}...${result.wallet.slice(-4)}`;
+          await bot.sendMessage(
+            MAIN_CHAT_ID,
+            `📢 **Staking Bonus Verified!**\n\n` +
+            `Wallet \`${shortWallet}\` has staked tokens on Moonbags.io!\n` +
+            `🎟️ They have been awarded an additional **${result.ticketsAdded}** tickets in the raffle!`,
+            { parse_mode: 'Markdown' }
+          );
+        }
+      }
+    } else {
+      await bot.sendMessage(chatId, `❌ Verification Failed: ${result.message}`);
+    }
+  } catch (error: any) {
+    logger.error('Error verifying stake:', error);
+    await bot.sendMessage(chatId, `❌ Error: ${error.message}`);
+  }
+}
 
 export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void> {
   const chatId = msg.chat.id;
