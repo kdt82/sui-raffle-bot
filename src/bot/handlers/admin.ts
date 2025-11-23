@@ -30,7 +30,7 @@ export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void
     // Update raffle status to ended (or we could add a 'cancelled' status)
     await prisma.raffle.update({
       where: { id: activeRaffle.id },
-      data: { 
+      data: {
         status: 'cancelled',
         updatedAt: new Date(),
       },
@@ -264,14 +264,14 @@ export async function handleSetMinimumPurchase(msg: TelegramBot.Message): Promis
 
     const message = minimumValue
       ? `✅ **Minimum purchase updated!**\n\n` +
-        `Raffle ID: \`${activeRaffle.id}\`\n` +
-        `Minimum Purchase: **${minimumValue} tokens**\n\n` +
-        `Purchases below this amount will not earn tickets.\n\n` +
-        `To remove the minimum, use: \`/set_minimum_purchase 0\``
+      `Raffle ID: \`${activeRaffle.id}\`\n` +
+      `Minimum Purchase: **${minimumValue} tokens**\n\n` +
+      `Purchases below this amount will not earn tickets.\n\n` +
+      `To remove the minimum, use: \`/set_minimum_purchase 0\``
       : `✅ **Minimum purchase removed!**\n\n` +
-        `Raffle ID: \`${activeRaffle.id}\`\n` +
-        `All purchases will now earn tickets.\n\n` +
-        `To set a minimum, use: \`/set_minimum_purchase <amount>\``;
+      `Raffle ID: \`${activeRaffle.id}\`\n` +
+      `All purchases will now earn tickets.\n\n` +
+      `To set a minimum, use: \`/set_minimum_purchase <amount>\``;
 
     await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
   } catch (error) {
@@ -399,10 +399,10 @@ export async function handleAwardPrize(msg: TelegramBot.Message): Promise<void> 
     const winner = endedRaffle.winners[0];
 
     if (winner.prizeAwarded) {
-      const txLink = winner.awardTxHash 
+      const txLink = winner.awardTxHash
         ? `\n🔗 [View Transaction](https://suiscan.xyz/mainnet/tx/${winner.awardTxHash})`
         : '';
-      
+
       await bot.sendMessage(
         chatId,
         `✅ *Prize already awarded!*\n\n` +
@@ -539,7 +539,7 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
 
     const totalTickets = totalTicketsResult._sum.ticketCount || 0;
     const totalParticipants = totalTicketsResult._count || 0;
-    const winnerPercentage = totalTickets > 0 
+    const winnerPercentage = totalTickets > 0
       ? ((Number(winner.ticketCount) / totalTickets) * 100).toFixed(2)
       : '0';
 
@@ -599,10 +599,10 @@ export async function handleShowWinner(msg: TelegramBot.Message): Promise<void> 
   } catch (error) {
     logger.error('Error in handleShowWinner:', error);
     logger.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    
+
     try {
       await bot.sendMessage(
-        chatId, 
+        chatId,
         `❌ Error retrieving winner information.\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease check logs for details.`
       );
     } catch (sendError) {
@@ -690,7 +690,7 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
 
     // Import selectWinner function
     const { selectWinner } = await import('../../services/winner-service');
-    
+
     logger.info('Calling selectWinner');
 
     // Select the winner
@@ -745,7 +745,7 @@ export async function handleSelectWinner(msg: TelegramBot.Message): Promise<void
   } catch (error) {
     logger.error('Error in handleSelectWinner:', error);
     logger.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    
+
     try {
       await bot.sendMessage(
         chatId,
@@ -793,8 +793,8 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
       return { _sum: { ticketCount: 0 } };
     });
 
-    const minimumText = activeRaffle.minimumPurchase 
-      ? `Minimum Purchase: ${activeRaffle.minimumPurchase} tokens` 
+    const minimumText = activeRaffle.minimumPurchase
+      ? `Minimum Purchase: ${activeRaffle.minimumPurchase} tokens`
       : 'Minimum Purchase: None (all purchases earn tickets)';
 
     const configMessage = `⚙️ **Raffle Configuration**\n\n` +
@@ -820,11 +820,11 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
     await bot.sendMessage(chatId, configMessage, { parse_mode: 'Markdown' });
   } catch (error) {
     logger.error('Error fetching config:', error);
-    
+
     // Provide more detailed error message
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     await bot.sendMessage(
-      chatId, 
+      chatId,
       `❌ Error fetching configuration.\n\n` +
       `This usually means the database schema needs to be updated.\n` +
       `The bot is redeploying now - please try again in 2-3 minutes.\n\n` +
@@ -842,7 +842,7 @@ export async function handleChatInfo(msg: TelegramBot.Message): Promise<void> {
     const chatType = chat.type;
     const chatTitle = chat.title || 'N/A';
     const chatUsername = (chat as any).username ? `@${(chat as any).username}` : 'N/A';
-    
+
     // Log to server for easy copy-paste
     logger.info(`📍 CHAT INFO - ID: ${chatId}, Type: ${chatType}, Title: ${chatTitle}, Username: ${chatUsername}`);
 
@@ -1159,7 +1159,7 @@ export async function handleBackfillTicketNumber(msg: TelegramBot.Message): Prom
       let winnerTicketEnd = BigInt(0);
 
       // Sort tickets to ensure consistent ordering
-      const sortedTickets = winner.raffle.tickets.sort((a, b) => 
+      const sortedTickets = winner.raffle.tickets.sort((a, b) =>
         a.walletAddress.localeCompare(b.walletAddress)
       );
 
@@ -1196,5 +1196,64 @@ export async function handleBackfillTicketNumber(msg: TelegramBot.Message): Prom
   } catch (error) {
     logger.error('Error backfilling ticket numbers:', error);
     await bot.sendMessage(chatId, '❌ Error backfilling ticket numbers. Check logs.');
+  }
+}
+export async function handleStartRaffle(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const args = msg.text?.split(' ').slice(1) || [];
+
+  if (args.length < 1) {
+    await bot.sendMessage(
+      chatId,
+      `📝 Usage: /start_raffle <raffle_id>\n\n` +
+      `Manually start a raffle and send the announcement.`
+    );
+    return;
+  }
+
+  const raffleId = args[0];
+
+  try {
+    // Import dynamically to avoid circular dependencies if any
+    const { startRaffle } = await import('../../services/raffle-service');
+
+    await bot.sendMessage(chatId, `🚀 Starting raffle ${raffleId}...`);
+
+    await startRaffle(raffleId);
+
+    await bot.sendMessage(chatId, `✅ Raffle ${raffleId} started successfully!`);
+  } catch (error) {
+    logger.error('Error starting raffle:', error);
+    await bot.sendMessage(chatId, `❌ Failed to start raffle: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function handleEndRaffle(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const args = msg.text?.split(' ').slice(1) || [];
+
+  if (args.length < 1) {
+    await bot.sendMessage(
+      chatId,
+      `📝 Usage: /end_raffle <raffle_id>\n\n` +
+      `Manually end a raffle and select a winner.`
+    );
+    return;
+  }
+
+  const raffleId = args[0];
+
+  try {
+    // Import dynamically to avoid circular dependencies if any
+    const { endRaffle } = await import('../../services/raffle-service');
+
+    await bot.sendMessage(chatId, `🏁 Ending raffle ${raffleId}...`);
+
+    await endRaffle(raffleId);
+
+    await bot.sendMessage(chatId, `✅ Raffle ${raffleId} ended successfully!`);
+  } catch (error) {
+    logger.error('Error ending raffle:', error);
+    await bot.sendMessage(chatId, `❌ Failed to end raffle: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

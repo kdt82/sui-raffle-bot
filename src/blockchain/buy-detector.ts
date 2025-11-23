@@ -12,22 +12,22 @@ import { bot } from '../bot';
 function getCountdownText(endTime: Date): string {
   const now = new Date();
   const diff = endTime.getTime() - now.getTime();
-  
+
   if (diff <= 0) {
     return '⏱️ Raffle Ended';
   }
-  
+
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-  
+
   const parts: string[] = [];
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
   if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
-  
+
   return `⏱️ Time Remaining: ${parts.join(' ')}`;
 }
 
@@ -98,7 +98,7 @@ export class BuyDetector {
       const raffle = await prisma.raffle.findFirst({
         where: {
           status: RAFFLE_STATUS.ACTIVE,
-          startTime: { lte: new Date() },
+          started: true, // Only track if manually started
           endTime: { gt: new Date() },
         },
         orderBy: { createdAt: 'desc' },
@@ -110,8 +110,8 @@ export class BuyDetector {
           this.activeRaffle.id !== raffle.id ||
           this.activeRaffle.ca !== raffle.ca;
 
-        this.activeRaffle = { 
-          id: raffle.id, 
+        this.activeRaffle = {
+          id: raffle.id,
           ca: raffle.ca,
           minimumPurchase: raffle.minimumPurchase,
           ticketsPerToken: raffle.ticketsPerToken
@@ -218,7 +218,7 @@ export class BuyDetector {
       } catch (error) {
         this.blockberryFailureCount++;
         logger.error(`Blockberry attempt ${this.blockberryFailureCount}/3 failed:`, error);
-        
+
         // After 3 consecutive failures, fall back to native SUI events
         if (this.blockberryFailureCount >= 3) {
           logger.warn('⚠️ Blockberry has failed 3 times, falling back to native SUI event stream for reliability');
@@ -427,9 +427,9 @@ export class BuyDetector {
         }
         const isDexSwap = await this.isTransferFromDexSwap(suiClient, trade.txDigest);
         if (!isDexSwap) {
-          logger.debug('Blockberry trade is actually a wallet transfer, skipping', { 
-            txDigest: trade.txDigest, 
-            wallet: trade.walletAddress 
+          logger.debug('Blockberry trade is actually a wallet transfer, skipping', {
+            txDigest: trade.txDigest,
+            wallet: trade.walletAddress
           });
           this.processedEventIds.add(trade.eventKey);
           continue;
@@ -842,14 +842,14 @@ export class BuyDetector {
   private calculateTicketCount(data: BuyEventData): number {
     try {
       // Get the tickets per token ratio for this raffle
-      const ticketsPerToken = this.activeRaffle?.ticketsPerToken 
-        ? parseFloat(this.activeRaffle.ticketsPerToken) 
+      const ticketsPerToken = this.activeRaffle?.ticketsPerToken
+        ? parseFloat(this.activeRaffle.ticketsPerToken)
         : DEFAULT_TICKETS_PER_TOKEN;
 
       // Check minimum purchase requirement
       if (this.activeRaffle?.minimumPurchase) {
         const minimumRequired = parseFloat(this.activeRaffle.minimumPurchase);
-        
+
         // Use rawAmount for comparison if available (more accurate)
         let purchaseAmount: number;
         if (data.rawAmount && data.decimals !== undefined) {
@@ -859,7 +859,7 @@ export class BuyDetector {
         } else {
           purchaseAmount = parseFloat(data.tokenAmount);
         }
-        
+
         if (!isNaN(minimumRequired) && !isNaN(purchaseAmount) && purchaseAmount < minimumRequired) {
           logger.info(`Purchase ${purchaseAmount} tokens is below minimum ${minimumRequired} tokens, no tickets awarded`, {
             wallet: data.walletAddress,
@@ -903,8 +903,8 @@ export class BuyDetector {
       return Math.floor(asFloat * ticketsPerToken);
     } catch (error) {
       logger.warn('Falling back to float-based ticket calculation', error);
-      const ticketsPerToken = this.activeRaffle?.ticketsPerToken 
-        ? parseFloat(this.activeRaffle.ticketsPerToken) 
+      const ticketsPerToken = this.activeRaffle?.ticketsPerToken
+        ? parseFloat(this.activeRaffle.ticketsPerToken)
         : DEFAULT_TICKETS_PER_TOKEN;
       const asFloat = Number.parseFloat(data.tokenAmount);
       if (Number.isNaN(asFloat)) {
@@ -986,13 +986,13 @@ export class BuyDetector {
           hasMoveCalls = true;
           const moveCall = (tx as any).MoveCall;
           const packageId = moveCall.package;
-          
+
           // Check if this is a call to a DEX package
           // Most DEX swaps will have "swap" in the function name
           const functionName = moveCall.function?.toLowerCase() || '';
-          const isSwapFunction = functionName.includes('swap') || 
-                                functionName.includes('trade') || 
-                                functionName.includes('exchange');
+          const isSwapFunction = functionName.includes('swap') ||
+            functionName.includes('trade') ||
+            functionName.includes('exchange');
 
           if (isSwapFunction) {
             logger.debug('Transfer is from DEX swap', { txDigest, function: moveCall.function });
@@ -1197,16 +1197,16 @@ export class BuyDetector {
 
       const shortWallet = `${data.walletAddress.slice(0, 6)}...${data.walletAddress.slice(-4)}`;
 
-      const minimumText = raffle.minimumPurchase 
-        ? `\n💎 Minimum Purchase: \`${raffle.minimumPurchase}\` tokens` 
+      const minimumText = raffle.minimumPurchase
+        ? `\n💎 Minimum Purchase: \`${raffle.minimumPurchase}\` tokens`
         : '';
 
       // Calculate countdown
       const countdown = getCountdownText(raffle.endTime);
 
       // Get the dynamic tickets per token ratio
-      const ticketsPerTokenRatio = raffle.ticketsPerToken 
-        ? parseFloat(raffle.ticketsPerToken) 
+      const ticketsPerTokenRatio = raffle.ticketsPerToken
+        ? parseFloat(raffle.ticketsPerToken)
         : 100;
 
       const message =

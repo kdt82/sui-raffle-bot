@@ -12,28 +12,24 @@ import { auditService } from './audit-service';
 const MAIN_CHAT_ID = process.env.MAIN_CHAT_ID;
 
 export async function checkAndStartRaffles(): Promise<void> {
-  try {
-    const rafflesToStart = await prisma.raffle.findMany({
-      where: {
-        status: RAFFLE_STATUS.ACTIVE,
-        startTime: { lte: new Date() },
-        started: false, // Only raffles that haven't sent start message yet
-      },
-    });
-
-    for (const raffle of rafflesToStart) {
-      await sendRaffleStartAnnouncement(raffle);
-    }
-  } catch (error) {
-    logger.error('Error checking for starting raffles:', error);
-  }
+  // Manual control requested: Auto-start disabled.
+  // Admins must use /start_raffle <id>
 }
 
-async function sendRaffleStartAnnouncement(raffle: any): Promise<void> {
+export async function startRaffle(raffleId: string): Promise<void> {
   try {
-    logger.info(`Sending start announcement for raffle: ${raffle.id}`);
+    const raffle = await prisma.raffle.findUnique({
+      where: { id: raffleId },
+    });
 
-    // Mark as started to prevent duplicate announcements
+    if (!raffle) {
+      logger.error(`Raffle ${raffleId} not found for start`);
+      return;
+    }
+
+    logger.info(`Starting raffle: ${raffle.id}`);
+
+    // Mark as started
     await prisma.raffle.update({
       where: { id: raffle.id },
       data: { started: true },
@@ -126,39 +122,28 @@ async function sendRaffleStartAnnouncement(raffle: any): Promise<void> {
 
     // Send admin notification
     await notificationService.sendAdminAlert(
-      `🚀 Raffle started!\n\n` +
+      `🚀 Raffle started manually!\n\n` +
       `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n` +
       `Started: ${new Date().toLocaleString()}\n` +
       `Ends: ${raffle.endTime.toLocaleString()}`
     );
   } catch (error) {
-    logger.error(`Error sending start announcement for raffle ${raffle.id}:`, error);
+    logger.error(`Error starting raffle ${raffleId}:`, error);
     // Revert started flag if announcement failed
     await prisma.raffle.update({
-      where: { id: raffle.id },
+      where: { id: raffleId },
       data: { started: false },
     }).catch(err => logger.error('Failed to revert started flag:', err));
+    throw error;
   }
 }
 
 export async function checkAndEndRaffles(): Promise<void> {
-  try {
-    const endedRaffles = await prisma.raffle.findMany({
-      where: {
-        status: RAFFLE_STATUS.ACTIVE,
-        endTime: { lte: new Date() },
-      },
-    });
-
-    for (const raffle of endedRaffles) {
-      await endRaffle(raffle.id);
-    }
-  } catch (error) {
-    logger.error('Error checking for ended raffles:', error);
-  }
+  // Manual control requested: Auto-end disabled.
+  // Admins must use /end_raffle <id>
 }
 
-async function endRaffle(raffleId: string): Promise<void> {
+export async function endRaffle(raffleId: string): Promise<void> {
   try {
     logger.info(`Ending raffle: ${raffleId}`);
 
@@ -184,7 +169,7 @@ async function endRaffle(raffleId: string): Promise<void> {
 
     // Send admin alert
     await notificationService.sendAdminAlert(
-      `🏁 Raffle ended!\n\n` +
+      `🏁 Raffle ended manually!\n\n` +
       `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n` +
       `Ended: ${raffle.endTime.toLocaleString()}\n\n` +
       `Winner will be selected automatically.`
@@ -202,6 +187,7 @@ async function endRaffle(raffleId: string): Promise<void> {
     logger.info(`Raffle ${raffleId} ended and winner selected`);
   } catch (error) {
     logger.error(`Error ending raffle ${raffleId}:`, error);
+    throw error;
   }
 }
 

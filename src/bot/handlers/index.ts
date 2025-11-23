@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand, handleWalletStatusCommand, handleUnlinkWalletCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleSelectWinner, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets, handleBackfillTicketNumber } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleSelectWinner, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets, handleBackfillTicketNumber, handleStartRaffle, handleEndRaffle } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
@@ -95,16 +95,16 @@ export function registerAdminHandlers(): void {
 
       // Check if it's a create_raffle callback
       if (callbackData.startsWith('select_prize_type_') ||
-          callbackData === 'confirm_create_raffle' ||
-          callbackData === 'cancel_create_raffle' ||
-          callbackData === 'start_now' ||
-          callbackData === 'ratio_default' ||
-          callbackData === 'skip_minimum_purchase' ||
-          callbackData === 'skip_media' ||
-          callbackData === 'skip_announcement_media' ||
-          callbackData === 'skip_notification_media' ||
-          callbackData === 'skip_leaderboard_media' ||
-          callbackData.startsWith('back_to_')) {
+        callbackData === 'confirm_create_raffle' ||
+        callbackData === 'cancel_create_raffle' ||
+        callbackData === 'start_now' ||
+        callbackData === 'ratio_default' ||
+        callbackData === 'skip_minimum_purchase' ||
+        callbackData === 'skip_media' ||
+        callbackData === 'skip_announcement_media' ||
+        callbackData === 'skip_notification_media' ||
+        callbackData === 'skip_leaderboard_media' ||
+        callbackData.startsWith('back_to_')) {
         await withCallbackRateLimit(query, 'callback_ui', async () => {
           await requireAdminPrivateCallback(query, async () => {
             await handleCreateRaffleCallback(query);
@@ -124,7 +124,7 @@ export function registerAdminHandlers(): void {
     try {
       const userId = BigInt(msg.from!.id);
       const conversation = conversationManager.getConversation(userId, msg.chat.id);
-      
+
       if (conversation && conversation.step.startsWith('create_raffle')) {
         await requireAdminPrivate(msg, async () => {
           await handleCreateRaffleStep(msg, conversation.step, conversation.data);
@@ -190,7 +190,7 @@ export function registerAdminHandlers(): void {
       try {
         const userId = BigInt(msg.from!.id);
         const conversation = conversationManager.getConversation(userId, msg.chat.id);
-        
+
         // Don't allow /upload_media during raffle creation
         if (conversation && conversation.step.startsWith('create_raffle')) {
           await bot.sendMessage(
@@ -201,7 +201,7 @@ export function registerAdminHandlers(): void {
           );
           return;
         }
-        
+
         await handleUploadMedia(msg);
       } catch (error) {
         logger.error('Error handling /upload_media command:', error);
@@ -437,6 +437,26 @@ export function registerAdminHandlers(): void {
         await handleBackfillTicketNumber(msg);
       } catch (error) {
         logger.error('Error handling /backfill_ticket_number command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/start_raffle/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleStartRaffle(msg);
+      } catch (error) {
+        logger.error('Error handling /start_raffle command:', error);
+      }
+    });
+  });
+
+  bot.onText(/\/end_raffle/, async (msg) => {
+    await requireAdminPrivate(msg, async () => {
+      try {
+        await handleEndRaffle(msg);
+      } catch (error) {
+        logger.error('Error handling /end_raffle command:', error);
       }
     });
   });

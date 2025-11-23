@@ -74,7 +74,7 @@ export class SellDetector {
       const raffle = await prisma.raffle.findFirst({
         where: {
           status: RAFFLE_STATUS.ACTIVE,
-          startTime: { lte: new Date() },
+          started: true, // Only track if manually started
           endTime: { gt: new Date() },
         },
         orderBy: { createdAt: 'desc' },
@@ -86,8 +86,8 @@ export class SellDetector {
           this.activeRaffle.id !== raffle.id ||
           this.activeRaffle.ca !== raffle.ca;
 
-        this.activeRaffle = { 
-          id: raffle.id, 
+        this.activeRaffle = {
+          id: raffle.id,
           ca: raffle.ca,
           ticketsPerToken: raffle.ticketsPerToken
         };
@@ -189,7 +189,7 @@ export class SellDetector {
       } catch (error) {
         this.blockberryFailureCount++;
         logger.error(`Blockberry sell poll attempt ${this.blockberryFailureCount}/3 failed:`, error);
-        
+
         if (this.blockberryFailureCount >= 3) {
           logger.warn('⚠️ Blockberry has failed 3 times, falling back to native SUI event stream for sells');
           this.blockberryFallbackActive = true;
@@ -257,55 +257,29 @@ export class SellDetector {
         if (this.initialized && timestamp <= this.lastProcessedTimestamp) continue;
 
         const parsed = (event.parsedJson as Record<string, any>) ?? {};
-        // For sells via TransferEvent, we care about the SENDER, but TransferEvent only gives us the recipient and amount.
-        // The sender is the transaction sender.
-        // However, TransferEvent<CoinType> means CoinType was transferred.
-        // If I transfer CoinType to a DEX, I am selling.
-        // So we need to check if the recipient is a DEX or if the transaction is a swap where I am the sender.
-        
-        // Actually, for TransferEvent, we can't easily see the sender in the event data itself without looking at the transaction.
-        // But we can infer it from the transaction block if needed, or rely on the fact that we are looking for swaps.
-        
-        // Wait, `BuyDetector` logic:
-        // It sees a TransferEvent of the Token.
-        // It checks if it's a DEX swap.
-        // If it is, it assumes the recipient of the Token is the Buyer.
-        
-        // For `SellDetector`:
-        // It sees a TransferEvent of the Token.
-        // It checks if it's a DEX swap.
-        // If it is, the person TRANSFERRING the token is the Seller.
-        // But TransferEvent doesn't list the sender. 
-        // We need to look at the transaction to find the sender.
-        
+
         const txDigest = event.id?.txDigest;
         if (!txDigest) {
-            this.processedEventIds.add(eventKey);
-            continue;
+          this.processedEventIds.add(eventKey);
+          continue;
         }
 
         const isDexSwap = await this.isTransferFromDexSwap(client, txDigest);
         if (!isDexSwap) {
-            // If it's not a DEX swap, it might be a simple transfer.
-            // If I send tokens to someone else, is that a sell? 
-            // Usually we only penalize selling to a DEX (dumping).
-            // Simple transfers might be OTC deals or moving wallets.
-            // Let's stick to DEX swaps for now to avoid penalizing legitimate transfers.
-            this.processedEventIds.add(eventKey);
-            continue;
+          this.processedEventIds.add(eventKey);
+          continue;
         }
 
-        // We need to find the sender of this transaction to identify the seller.
         const sender = await this.getTransactionSender(client, txDigest);
         if (!sender) {
-            this.processedEventIds.add(eventKey);
-            continue;
+          this.processedEventIds.add(eventKey);
+          continue;
         }
 
         const amountRaw = this.extractAmount(parsed);
         if (!amountRaw) {
-            this.processedEventIds.add(eventKey);
-            continue;
+          this.processedEventIds.add(eventKey);
+          continue;
         }
 
         const decimals = await this.getCoinDecimals(client, coinType);
@@ -438,7 +412,6 @@ export class SellDetector {
 
     trades.forEach((trade, index) => {
       try {
-        // ... (Same extraction logic as BuyDetector for basic fields)
         const txDigest = this.pickString(trade, ['txDigest', 'transactionDigest', 'digest', 'tx_hash', 'txHash']);
         if (!txDigest) return;
 
@@ -476,20 +449,14 @@ export class SellDetector {
         const walletAddress = this.pickString(trade, ['buyerAddress', 'senderAddress', 'address', 'owner', 'walletAddress']);
         if (!walletAddress) return;
 
-        // For a sell, the amount of interest is the amount of Target Coin I gave (Input)
-        // Blockberry usually structures this as "inCoin" or "tokenIn" for the input
-        // But sometimes "amount" refers to the trade size in the primary token.
-        
-        // Let's look for the amount corresponding to the Target Coin.
         let amountRaw: string | null = null;
         let decimals: number | undefined = undefined;
 
         if (normalizedIn === normalizedTarget) {
-             amountRaw = this.pickString(trade, ['inCoin.amount', 'amountIn', 'tokenInAmount', 'amount']);
-             decimals = this.pickNumber(trade, ['inCoin.decimals', 'decimalsIn', 'tokenInDecimals']);
+          amountRaw = this.pickString(trade, ['inCoin.amount', 'amountIn', 'tokenInAmount', 'amount']);
+          decimals = this.pickNumber(trade, ['inCoin.decimals', 'decimalsIn', 'tokenInDecimals']);
         } else {
-            // Fallback, try to find amount associated with the target coin
-             amountRaw = this.pickString(trade, ['amount']); // Hope this is the right one
+          amountRaw = this.pickString(trade, ['amount']);
         }
 
         if (!amountRaw) return;
@@ -513,18 +480,15 @@ export class SellDetector {
     return results;
   }
 
-  // ... (Helper methods: getTransactionSender, isTransferFromDexSwap, etc.)
-  // I need to implement getTransactionSender as it's new.
-  
   private async getTransactionSender(client: SuiClient, txDigest: string): Promise<string | null> {
     try {
-        const tx = await client.getTransactionBlock({
-            digest: txDigest,
-            options: { showInput: true }
-        });
-        return tx.transaction?.data.sender ?? null;
+      const tx = await client.getTransactionBlock({
+        digest: txDigest,
+        options: { showInput: true }
+      });
+      return tx.transaction?.data.sender ?? null;
     } catch (e) {
-        return null;
+      return null;
     }
   }
 
@@ -567,10 +531,9 @@ export class SellDetector {
   }
 
   private calculateTicketRemoval(data: SellEventData): number {
-    // Same logic as buy, but for removal
     try {
-      const ticketsPerToken = this.activeRaffle?.ticketsPerToken 
-        ? parseFloat(this.activeRaffle.ticketsPerToken) 
+      const ticketsPerToken = this.activeRaffle?.ticketsPerToken
+        ? parseFloat(this.activeRaffle.ticketsPerToken)
         : DEFAULT_TICKETS_PER_TOKEN;
 
       if (data.rawAmount && data.decimals !== undefined) {
@@ -595,9 +558,6 @@ export class SellDetector {
     }
   }
 
-  // ... (Copy helper methods from BuyDetector: pickString, pickNumber, getNestedValue, parseTimestamp, compactProcessedEvents, getEventKey, isTransferFromDexSwap, extractAmount, getCoinDecimals, formatAmount)
-  // I will include these in the full file content.
-  
   private getNestedValue(source: Record<string, any>, path: string): any {
     if (!source) return undefined;
     if (!path.includes('.')) return source?.[path];
@@ -667,8 +627,7 @@ export class SellDetector {
   }
 
   private async isTransferFromDexSwap(client: SuiClient, txDigest: string): Promise<boolean> {
-    // ... (Copy from BuyDetector)
-     try {
+    try {
       const txResponse = await client.getTransactionBlock({
         digest: txDigest,
         options: {
@@ -699,9 +658,9 @@ export class SellDetector {
           const moveCall = (tx as any).MoveCall;
           const packageId = moveCall.package;
           const functionName = moveCall.function?.toLowerCase() || '';
-          const isSwapFunction = functionName.includes('swap') || 
-                                functionName.includes('trade') || 
-                                functionName.includes('exchange');
+          const isSwapFunction = functionName.includes('swap') ||
+            functionName.includes('trade') ||
+            functionName.includes('exchange');
 
           if (isSwapFunction) {
             isDexSwap = true;
