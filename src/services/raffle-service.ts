@@ -46,21 +46,25 @@ export async function startRaffle(raffleId: string): Promise<void> {
       ? `For every token you purchase, you'll receive **${ratio} raffle tickets**!`
       : `For every **${Math.round(1 / ratio).toLocaleString()} tokens** you purchase, you'll receive **1 raffle ticket**!`;
 
-    const minimumPurchaseText = raffle.minimumPurchase
-      ? `\n\n🎫 **Minimum Purchase:** ${raffle.minimumPurchase} tokens`
-      : '';
+    const bonusPercent = raffle.stakingBonusPercent || 25;
 
     const startMessage =
-      `🚀 **RAFFLE HAS STARTED!** 🚀\n\n` +
+      `🎉 **A New Raffle Has Started** 🎉\n\n` +
       `💰 **Prize:** ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
-      `⏰ **Active Now Until:** ${formatDate(raffle.endTime)} UTC\n\n` +
-      `📝 **Contract Address:**\n\`${raffle.ca}\`${minimumPurchaseText}\n\n` +
+      `📅 **Start:** ${formatDate(raffle.startTime || new Date())} UTC\n` +
+      `📅 **End:** ${formatDate(raffle.endTime)} UTC\n\n` +
+      `📝 **Contract Address:**\n\`${raffle.ca}\`\n\n` +
+      `🎫 **Minimum Purchase for Eligibility:** ${raffle.minimumPurchase || '0'} tokens\n\n` +
       `🎟️ **Ticket Allocation:**\n${ticketExplanation}\n\n` +
-      `🔗 **Quick Start:**\n` +
-      `1. Link wallet: /linkwallet <address>\n` +
-      `2. Buy tokens now!\n` +
-      `3. Tickets earned automatically\n\n` +
-      `⚠️ **Link your wallet first!**\n\n` +
+      `🔗 **How to Enter:**\n` +
+      `1. Purchase and HOLD tokens during raffle period @ Moonbags.io or Cetus.zone\n` +
+      `2. Tickets are allocated automatically\n` +
+      `3. Optional BONUS - Stake on Moonbags.io and receive ${bonusPercent}% extra tickets\n\n` +
+      `📱 **Commands:**\n` +
+      `/leaderboard - See standings\n\n` +
+      `⚠️ **RULES**\n` +
+      `1. Only purchases during raffle period count.\n` +
+      `2. BUY tickets and BONUS tickets will be removed if sold or unstaked during the raffle period\n\n` +
       `Good luck! 🍀`;
 
     // Send with announcement media if available
