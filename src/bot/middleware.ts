@@ -9,8 +9,27 @@ export async function isAdmin(telegramUserId: bigint): Promise<boolean> {
     const admin = await prisma.admin.findUnique({
       where: { telegramUserId },
     });
-    logger.info(`Admin found: ${!!admin}`, admin ? { id: admin.id, permissions: admin.permissions } : {});
-    return !!admin;
+
+    if (admin) {
+      logger.info(`Admin found: true`, { id: admin.id, permissions: admin.permissions });
+      return true;
+    }
+
+    // Auto-promote first user if no admins exist
+    const adminCount = await prisma.admin.count();
+    if (adminCount === 0) {
+      logger.info(`No admins found in database. Promoting user ${telegramUserId} to super_admin.`);
+      await prisma.admin.create({
+        data: {
+          telegramUserId,
+          permissions: 'super_admin',
+        },
+      });
+      return true;
+    }
+
+    logger.info(`Admin found: false`);
+    return false;
   } catch (error) {
     logger.error('Error checking admin status:', error);
     return false;
@@ -82,7 +101,7 @@ export async function requireAdminPrivate(
     );
     return;
   }
-  
+
   // Then check admin status
   const userId = BigInt(msg.from!.id);
   if (!(await isAdmin(userId))) {
@@ -92,7 +111,7 @@ export async function requireAdminPrivate(
     );
     return;
   }
-  
+
   await callback();
 }
 
@@ -104,7 +123,7 @@ export async function requireAdminPrivateCallback(
   callback: () => Promise<void>
 ): Promise<void> {
   const chatType = query.message?.chat.type;
-  
+
   // First check if private chat
   if (chatType !== 'private') {
     await bot.answerCallbackQuery(query.id, {
@@ -113,7 +132,7 @@ export async function requireAdminPrivateCallback(
     });
     return;
   }
-  
+
   // Then check admin status
   const userId = BigInt(query.from.id);
   logger.info(`Checking admin status for callback from Telegram user ID: ${userId}`);
@@ -124,7 +143,7 @@ export async function requireAdminPrivateCallback(
     });
     return;
   }
-  
+
   await callback();
 }
 

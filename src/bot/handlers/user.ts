@@ -15,7 +15,7 @@ export async function handleStartCommand(msg: TelegramBot.Message): Promise<void
     const userId = BigInt(msg.from!.id);
     incrementCommand('start', false);
     await analyticsService.trackActivity(userId, 'command', { command: 'start' });
-    
+
     const welcomeMessage = `
 🎰 Welcome to the SUI Raffle Bot!
 
@@ -42,6 +42,22 @@ Good luck! 🍀
   });
 }
 
+export async function handleMyIdCommand(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const userId = msg.from!.id;
+  const username = msg.from?.username || 'No username';
+
+  await bot.sendMessage(
+    chatId,
+    `👤 **Your Telegram Info**\n\n` +
+    `User ID: \`${userId}\`\n` +
+    `Username: @${username}\n\n` +
+    `_Use this ID to add yourself as an admin in the database_`,
+    { parse_mode: 'Markdown' }
+  );
+}
+
+
 export async function handleLeaderboardCommand(msg: TelegramBot.Message): Promise<void> {
   return withRateLimit(msg, 'leaderboard', RATE_LIMITS.LEADERBOARD, async () => {
     const chatId = msg.chat.id;
@@ -50,56 +66,56 @@ export async function handleLeaderboardCommand(msg: TelegramBot.Message): Promis
     await analyticsService.trackActivity(userId, 'command', { command: 'leaderboard' });
 
     try {
-    // Find active raffle
-    const activeRaffle = await prisma.raffle.findFirst({
-      where: {
-        status: RAFFLE_STATUS.ACTIVE,
-        endTime: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+      // Find active raffle
+      const activeRaffle = await prisma.raffle.findFirst({
+        where: {
+          status: RAFFLE_STATUS.ACTIVE,
+          endTime: { gt: new Date() },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
 
-    if (!activeRaffle) {
-      await bot.sendMessage(chatId, '📭 No active raffle found.');
-      return;
-    }
+      if (!activeRaffle) {
+        await bot.sendMessage(chatId, '📭 No active raffle found.');
+        return;
+      }
 
-    // Get top 25 tickets
-    const topTickets = await prisma.ticket.findMany({
-      where: {
-        raffleId: activeRaffle.id,
-        ticketCount: { gt: 0 },
-      },
-      orderBy: { ticketCount: 'desc' },
-      take: 25,
-    });
+      // Get top 25 tickets
+      const topTickets = await prisma.ticket.findMany({
+        where: {
+          raffleId: activeRaffle.id,
+          ticketCount: { gt: 0 },
+        },
+        orderBy: { ticketCount: 'desc' },
+        take: 25,
+      });
 
-    if (topTickets.length === 0) {
-      await bot.sendMessage(chatId, '📊 No tickets allocated yet. Buy tokens to get started!');
-      return;
-    }
+      if (topTickets.length === 0) {
+        await bot.sendMessage(chatId, '📊 No tickets allocated yet. Buy tokens to get started!');
+        return;
+      }
 
-    // Get total participant count
-    const totalParticipants = await prisma.ticket.count({
-      where: {
-        raffleId: activeRaffle.id,
-        ticketCount: { gt: 0 },
-      },
-    });
+      // Get total participant count
+      const totalParticipants = await prisma.ticket.count({
+        where: {
+          raffleId: activeRaffle.id,
+          ticketCount: { gt: 0 },
+        },
+      });
 
-    let leaderboardMessage = '🏆 **Leaderboard**\n\n';
-    leaderboardMessage += `Raffle ends: ${formatDate(activeRaffle.endTime)} UTC\n\n`;
+      let leaderboardMessage = '🏆 **Leaderboard**\n\n';
+      leaderboardMessage += `Raffle ends: ${formatDate(activeRaffle.endTime)} UTC\n\n`;
 
-    topTickets.forEach((ticket, index) => {
-      const rank = index + 1;
-      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
-      leaderboardMessage += `${medal} ${ticket.walletAddress.slice(0, 8)}...${ticket.walletAddress.slice(-6)} - ${ticket.ticketCount.toLocaleString()} tickets\n`;
-    });
+      topTickets.forEach((ticket, index) => {
+        const rank = index + 1;
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+        leaderboardMessage += `${medal} ${ticket.walletAddress.slice(0, 8)}...${ticket.walletAddress.slice(-6)} - ${ticket.ticketCount.toLocaleString()} tickets\n`;
+      });
 
-    // Add footer with total participants
-    if (totalParticipants > 25) {
-      leaderboardMessage += `\n_Showing top 25 of ${totalParticipants} participants_`;
-    }
+      // Add footer with total participants
+      if (totalParticipants > 25) {
+        leaderboardMessage += `\n_Showing top 25 of ${totalParticipants} participants_`;
+      }
 
       // Send with leaderboard media if available
       if (activeRaffle.leaderboardMediaUrl && activeRaffle.leaderboardMediaType) {
@@ -161,45 +177,45 @@ export async function handleMyTicketsCommand(msg: TelegramBot.Message): Promise<
     await analyticsService.trackActivity(userId, 'command', { command: 'mytickets' });
 
     try {
-    // Find user's linked wallet
-    const walletUser = await prisma.walletUser.findFirst({
-      where: { telegramUserId: userId },
-    });
+      // Find user's linked wallet
+      const walletUser = await prisma.walletUser.findFirst({
+        where: { telegramUserId: userId },
+      });
 
-    if (!walletUser) {
-      await bot.sendMessage(
-        chatId,
-        '🔗 No wallet linked. Use /linkwallet <address> to link your wallet address.'
-      );
-      return;
-    }
+      if (!walletUser) {
+        await bot.sendMessage(
+          chatId,
+          '🔗 No wallet linked. Use /linkwallet <address> to link your wallet address.'
+        );
+        return;
+      }
 
-    // Find active raffle
-    const activeRaffle = await prisma.raffle.findFirst({
-      where: {
-        status: RAFFLE_STATUS.ACTIVE,
-        endTime: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!activeRaffle) {
-      await bot.sendMessage(chatId, '📭 No active raffle found.');
-      return;
-    }
-
-    // Get user's tickets
-    const ticket = await prisma.ticket.findUnique({
-      where: {
-        raffleId_walletAddress: {
-          raffleId: activeRaffle.id,
-          walletAddress: walletUser.walletAddress,
+      // Find active raffle
+      const activeRaffle = await prisma.raffle.findFirst({
+        where: {
+          status: RAFFLE_STATUS.ACTIVE,
+          endTime: { gt: new Date() },
         },
-      },
-    });
+        orderBy: { createdAt: 'desc' },
+      });
 
-    const ticketCount = ticket?.ticketCount || 0;
-    const message = `🎫 Your Tickets\n\nWallet: ${walletUser.walletAddress}\nTickets: ${ticketCount.toLocaleString()}\n\nRaffle ends: ${formatDate(activeRaffle.endTime)} UTC`;
+      if (!activeRaffle) {
+        await bot.sendMessage(chatId, '📭 No active raffle found.');
+        return;
+      }
+
+      // Get user's tickets
+      const ticket = await prisma.ticket.findUnique({
+        where: {
+          raffleId_walletAddress: {
+            raffleId: activeRaffle.id,
+            walletAddress: walletUser.walletAddress,
+          },
+        },
+      });
+
+      const ticketCount = ticket?.ticketCount || 0;
+      const message = `🎫 Your Tickets\n\nWallet: ${walletUser.walletAddress}\nTickets: ${ticketCount.toLocaleString()}\n\nRaffle ends: ${formatDate(activeRaffle.endTime)} UTC`;
 
       await bot.sendMessage(chatId, message);
     } catch (error) {
@@ -219,57 +235,57 @@ export async function handleLinkWalletCommand(msg: TelegramBot.Message): Promise
 
     const args = msg.text?.split(' ').slice(1) || [];
 
-  if (args.length === 0) {
-    await bot.sendMessage(
-      chatId,
-      '📝 Usage: /linkwallet <wallet_address>\n\nExample: /linkwallet 0x1234567890abcdef...'
-    );
-    return;
-  }
+    if (args.length === 0) {
+      await bot.sendMessage(
+        chatId,
+        '📝 Usage: /linkwallet <wallet_address>\n\nExample: /linkwallet 0x1234567890abcdef...'
+      );
+      return;
+    }
 
-  const walletAddress = args[0].trim();
+    const walletAddress = args[0].trim();
 
-  // Basic validation - SUI addresses typically start with 0x and are 66 chars
-  if (!walletAddress.startsWith('0x') || walletAddress.length < 20) {
-    await bot.sendMessage(chatId, '❌ Invalid wallet address format. Please check and try again.');
-    return;
-  }
+    // Basic validation - SUI addresses typically start with 0x and are 66 chars
+    if (!walletAddress.startsWith('0x') || walletAddress.length < 20) {
+      await bot.sendMessage(chatId, '❌ Invalid wallet address format. Please check and try again.');
+      return;
+    }
 
-  try {
-    // Check if wallet already exists (to determine if new or relink)
-    const existing = await prisma.walletUser.findUnique({
-      where: { walletAddress },
-    });
-    const isNew = !existing;
+    try {
+      // Check if wallet already exists (to determine if new or relink)
+      const existing = await prisma.walletUser.findUnique({
+        where: { walletAddress },
+      });
+      const isNew = !existing;
 
-    // Upsert wallet user
-    await prisma.walletUser.upsert({
-      where: { walletAddress },
-      update: {
-        telegramUserId: userId,
-        telegramUsername: username,
-        linkedAt: new Date(),
-      },
-      create: {
-        walletAddress,
-        telegramUserId: userId,
-        telegramUsername: username,
-        verified: false,
-      },
-    });
+      // Upsert wallet user
+      await prisma.walletUser.upsert({
+        where: { walletAddress },
+        update: {
+          telegramUserId: userId,
+          telegramUsername: username,
+          linkedAt: new Date(),
+        },
+        create: {
+          walletAddress,
+          telegramUserId: userId,
+          telegramUsername: username,
+          verified: false,
+        },
+      });
 
-    // AUDIT LOG: Wallet linked (non-blocking)
-    auditService.logWalletLinked(userId, username || undefined, walletAddress, isNew).catch(err =>
-      logger.error('Audit log failed (non-blocking):', err)
-    );
+      // AUDIT LOG: Wallet linked (non-blocking)
+      auditService.logWalletLinked(userId, username || undefined, walletAddress, isNew).catch(err =>
+        logger.error('Audit log failed (non-blocking):', err)
+      );
 
-    await bot.sendMessage(
-      chatId,
-      `✅ Wallet linked successfully!\n\nWallet: ${walletAddress}\n\nYour tickets will be automatically allocated when you make purchases.`
-    );
+      await bot.sendMessage(
+        chatId,
+        `✅ Wallet linked successfully!\n\nWallet: ${walletAddress}\n\nYour tickets will be automatically allocated when you make purchases.`
+      );
 
-    // Track wallet link activity
-    await analyticsService.trackActivity(userId, 'wallet_link', { walletAddress });
+      // Track wallet link activity
+      await analyticsService.trackActivity(userId, 'wallet_link', { walletAddress });
     } catch (error) {
       logger.error('Error linking wallet:', error);
       await bot.sendMessage(chatId, '❌ Error linking wallet. Please try again.');

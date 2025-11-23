@@ -1,6 +1,6 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
-import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand, handleWalletStatusCommand, handleUnlinkWalletCommand } from './user';
+import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand, handleWalletStatusCommand, handleUnlinkWalletCommand, handleMyIdCommand } from './user';
 import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleSelectWinner, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets, handleBackfillTicketNumber, handleStartRaffle, handleEndRaffle } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
@@ -18,6 +18,14 @@ export function registerUserHandlers(): void {
       await handleStartCommand(msg);
     } catch (error) {
       logger.error('Error handling /start command:', error);
+    }
+  });
+
+  bot.onText(/\/myid/, async (msg) => {
+    try {
+      await handleMyIdCommand(msg);
+    } catch (error) {
+      logger.error('Error handling /myid command:', error);
     }
   });
 
