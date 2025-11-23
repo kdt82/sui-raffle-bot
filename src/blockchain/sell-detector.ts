@@ -264,14 +264,19 @@ export class SellDetector {
           continue;
         }
 
-        const isDexSwap = await this.isTransferFromDexSwap(client, txDigest);
-        if (!isDexSwap) {
+        // Removed DEX check to capture ALL outgoing transfers (robustness)
+        // const isDexSwap = await this.isTransferFromDexSwap(client, txDigest);
+        // if (!isDexSwap) { ... }
+
+        const sender = await this.getTransactionSender(client, txDigest);
+        if (!sender) {
           this.processedEventIds.add(eventKey);
           continue;
         }
 
-        const sender = await this.getTransactionSender(client, txDigest);
-        if (!sender) {
+        // Check for self-transfer (consolidating coins)
+        const recipient = this.extractRecipient(parsed);
+        if (recipient && recipient === sender) {
           this.processedEventIds.add(eventKey);
           continue;
         }
@@ -285,10 +290,13 @@ export class SellDetector {
         const decimals = await this.getCoinDecimals(client, coinType);
         const tokenAmount = this.formatAmount(amountRaw, decimals);
 
+        // Use composite key for transactionHash to handle multiple transfers in one tx
+        const uniqueTransactionKey = `${txDigest}:${event.id?.eventSeq}`;
+
         const sellEvent: SellEventData = {
           walletAddress: sender,
           tokenAmount,
-          transactionHash: txDigest,
+          transactionHash: uniqueTransactionKey,
           timestamp: new Date(timestamp),
           rawAmount: amountRaw,
           decimals,
@@ -367,20 +375,18 @@ export class SellDetector {
           decimals = await this.getCoinDecimals(suiClient, trade.coinType);
         }
 
-        // Validate DEX swap
-        if (!suiClient) suiClient = getSuiClient();
-        const isDexSwap = await this.isTransferFromDexSwap(suiClient, trade.txDigest);
-        if (!isDexSwap) {
-          this.processedEventIds.add(trade.eventKey);
-          continue;
-        }
+        // Removed DEX check to capture ALL outgoing transfers
+        // if (!suiClient) suiClient = getSuiClient();
+        // const isDexSwap = await this.isTransferFromDexSwap(suiClient, trade.txDigest);
+        // if (!isDexSwap) { ... }
 
         const tokenAmount = this.formatAmount(trade.amountRaw, decimals);
 
+        // Use eventKey as transactionHash to ensure uniqueness per trade/event
         const sellEvent: SellEventData = {
           walletAddress: trade.walletAddress,
           tokenAmount,
-          transactionHash: trade.txDigest,
+          transactionHash: trade.eventKey,
           timestamp: new Date(trade.timestamp),
           rawAmount: trade.amountRaw,
           decimals,
@@ -626,62 +632,6 @@ export class SellDetector {
     return `${txDigest}:${seq}`;
   }
 
-  private async isTransferFromDexSwap(client: SuiClient, txDigest: string): Promise<boolean> {
-    try {
-      const txResponse = await client.getTransactionBlock({
-        digest: txDigest,
-        options: {
-          showInput: true,
-          showEffects: true,
-        },
-      });
-
-      if (!txResponse || !txResponse.transaction) return false;
-
-      const txData = txResponse.transaction.data;
-      if (!txData || txData.transaction.kind !== 'ProgrammableTransaction') return false;
-
-      const programmableTx = txData.transaction;
-      if (!programmableTx.transactions || programmableTx.transactions.length === 0) return false;
-
-      const dexPackages = [
-        '0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb', // Cetus
-        '0x91bfbc386a41afcfd9b2533058d7e915a1d3829089cc268ff4333d54d6339ca1', // Turbos
-        '0xa0eba10b173538c8fecca1dff298e488402cc9ff374f8a12ca7758eebe830b66', // Kriya
-        '0xdee9', // DeepBook
-      ];
-
-      let isDexSwap = false;
-
-      for (const tx of programmableTx.transactions) {
-        if ('MoveCall' in tx) {
-          const moveCall = (tx as any).MoveCall;
-          const packageId = moveCall.package;
-          const functionName = moveCall.function?.toLowerCase() || '';
-          const isSwapFunction = functionName.includes('swap') ||
-            functionName.includes('trade') ||
-            functionName.includes('exchange');
-
-          if (isSwapFunction) {
-            isDexSwap = true;
-            break;
-          }
-
-          for (const dexPkg of dexPackages) {
-            if (packageId.startsWith(dexPkg)) {
-              isDexSwap = true;
-              break;
-            }
-          }
-          if (isDexSwap) break;
-        }
-      }
-      return isDexSwap;
-    } catch (error) {
-      return false;
-    }
-  }
-
   private extractAmount(data: Record<string, any>): string | null {
     const candidateKeys = ['amount', 'quantity', 'value', 'coinAmount'];
     for (const key of candidateKeys) {
@@ -689,6 +639,17 @@ export class SellDetector {
     }
     if (data.fields && typeof data.fields === 'object') {
       return this.extractAmount(data.fields as Record<string, any>);
+    }
+    return null;
+  }
+
+  private extractRecipient(data: Record<string, any>): string | null {
+    const candidateKeys = ['recipient', 'to', 'receiver', 'destination'];
+    for (const key of candidateKeys) {
+      if (data[key] !== undefined && data[key] !== null) return String(data[key]);
+    }
+    if (data.fields && typeof data.fields === 'object') {
+      return this.extractRecipient(data.fields as Record<string, any>);
     }
     return null;
   }
