@@ -1743,6 +1743,11 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       ? `\nMinimum Purchase: ${raffle.minimumPurchase} tokens`
       : '';
 
+    // Format prize display
+    const prizeDisplay = raffle.prizeDescription
+      ? raffle.prizeDescription
+      : `${raffle.prizeAmount} ${raffle.prizeType}`;
+
     // Send confirmation to admin
     await bot.sendMessage(
       chatId,
@@ -1752,7 +1757,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       `DEX: ${DEFAULT_DEX.toUpperCase()}\n` +
       `Start: ${raffle.startTime.toLocaleString()} UTC\n` +
       `Ends: ${raffle.endTime.toLocaleString()} UTC\n` +
-      `Prize: ${raffle.prizeAmount} ${raffle.prizeType}\n` +
+      `Prize:\n${prizeDisplay}\n` +
       `Ticket Ratio: ${ratioDisplay}${minimumText}`,
       { parse_mode: 'Markdown' }
     );
@@ -1772,7 +1777,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
 
         const announcementMessage =
           `🎉 **A New Raffle Has Been Scheduled!** 🎉\n\n` +
-          `💰 **Prize:** ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
+          `💰 **Prize:**\n${prizeDisplay}\n\n` +
           `📅 **Start:** ${formatDate(raffle.startTime)} UTC\n` +
           `📅 **End:** ${formatDate(raffle.endTime)} UTC\n\n` +
           `📝 **Contract Address:**\n\`${raffle.ca}\`${minimumPurchaseText}\n\n` +
