@@ -408,6 +408,15 @@ export class SellDetector {
 
     trades.forEach((trade, index) => {
       try {
+        // Skip stake/unstake transactions - they're handled by StakeDetector
+        const functions = trade.functions;
+        if (Array.isArray(functions)) {
+          const functionsLower = functions.map((f: string) => f.toLowerCase());
+          if (functionsLower.includes('stake') || functionsLower.includes('unstake')) {
+            return; // Skip this transaction
+          }
+        }
+
         // Extract transaction hash
         const txDigest = this.pickString(trade, ['txHash', 'txDigest', 'transactionDigest', 'digest', 'tx_hash']);
         if (!txDigest) return;
