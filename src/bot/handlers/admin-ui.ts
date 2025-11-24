@@ -1775,10 +1775,17 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
       { parse_mode: 'Markdown' }
     );
 
-    // Send announcement to main chat
-    if (MAIN_CHAT_ID) {
+    // Send announcement to project's broadcast channel
+    // Fetch the project to get broadcastChannelId
+    const project = await prisma.project.findUnique({
+      where: { id: data.projectId },
+    });
+
+    const broadcastChannelId = project?.broadcastChannelId;
+
+    if (broadcastChannelId) {
       try {
-        logger.info(`Attempting to send raffle announcement to MAIN_CHAT_ID: ${MAIN_CHAT_ID}`);
+        logger.info(`Attempting to send raffle announcement to broadcast channel: ${broadcastChannelId}`);
 
         const minimumPurchaseText = raffle.minimumPurchase
           ? `\n\n🎫 **Minimum Purchase for Eligibility:** ${raffle.minimumPurchase} tokens`
@@ -1817,7 +1824,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
           // Try to send as photo/video/animation first
           if (raffle.announcementMediaType === 'image') {
             try {
-              await bot.sendPhoto(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+              await bot.sendPhoto(String(broadcastChannelId), raffle.announcementMediaUrl, {
                 caption: announcementMessage,
                 parse_mode: 'Markdown',
               });
@@ -1826,7 +1833,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
               // If it fails because it's a document, try sendDocument instead
               if (photoError?.message?.includes('Document as Photo')) {
                 logger.warn('Photo is actually a document, sending as document instead');
-                await bot.sendDocument(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+                await bot.sendDocument(String(broadcastChannelId), raffle.announcementMediaUrl, {
                   caption: announcementMessage,
                   parse_mode: 'Markdown',
                 });
@@ -1837,7 +1844,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
             }
           } else if (raffle.announcementMediaType === 'video') {
             try {
-              await bot.sendVideo(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+              await bot.sendVideo(String(broadcastChannelId), raffle.announcementMediaUrl, {
                 caption: announcementMessage,
                 parse_mode: 'Markdown',
               });
@@ -1845,7 +1852,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
             } catch (videoError: any) {
               if (videoError?.message?.includes('Document as Video')) {
                 logger.warn('Video is actually a document, sending as document instead');
-                await bot.sendDocument(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+                await bot.sendDocument(String(broadcastChannelId), raffle.announcementMediaUrl, {
                   caption: announcementMessage,
                   parse_mode: 'Markdown',
                 });
@@ -1855,7 +1862,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
               }
             }
           } else if (raffle.announcementMediaType === 'gif') {
-            await bot.sendAnimation(MAIN_CHAT_ID, raffle.announcementMediaUrl, {
+            await bot.sendAnimation(String(broadcastChannelId), raffle.announcementMediaUrl, {
               caption: announcementMessage,
               parse_mode: 'Markdown',
             });
@@ -1867,25 +1874,25 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
           }
         } else {
           logger.info('Sending announcement without media');
-          await bot.sendMessage(MAIN_CHAT_ID, announcementMessage, { parse_mode: 'Markdown' });
+          await bot.sendMessage(String(broadcastChannelId), announcementMessage, { parse_mode: 'Markdown' });
         }
-        logger.info(`✅ Raffle announcement sent successfully to main chat: ${raffle.id}`);
+        logger.info(`✅ Raffle announcement sent successfully to broadcast channel ${broadcastChannelId}: ${raffle.id}`);
       } catch (error) {
         logger.error('❌ Error sending raffle announcement to main chat:', error);
         // Also notify the admin that announcement failed
         await bot.sendMessage(
           chatId,
-          `⚠️ Warning: Raffle created but announcement to main chat failed.\n` +
+          `⚠️ Warning: Raffle created but announcement to broadcast channel failed.\n` +
           `Error: ${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
-          `Please check MAIN_CHAT_ID configuration and bot permissions.`
+          `Please check bot permissions in the group.`
         );
       }
     } else {
-      logger.warn('MAIN_CHAT_ID not configured - skipping raffle announcement');
+      logger.warn('Broadcast channel not configured for project - skipping raffle announcement');
       await bot.sendMessage(
         chatId,
-        `⚠️ Warning: MAIN_CHAT_ID not configured.\n` +
-        `Raffle created but not announced to main chat.`
+        `⚠️ Warning: Broadcast channel not configured for this project.\n` +
+        `Raffle created but not announced to group chat.`
       );
     }
   } catch (error) {
