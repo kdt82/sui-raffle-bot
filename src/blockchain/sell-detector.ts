@@ -408,51 +408,40 @@ export class SellDetector {
 
     trades.forEach((trade, index) => {
       try {
-        const txDigest = this.pickString(trade, ['txDigest', 'transactionDigest', 'digest', 'tx_hash', 'txHash']);
+        // Extract transaction hash
+        const txDigest = this.pickString(trade, ['txHash', 'txDigest', 'transactionDigest', 'digest', 'tx_hash']);
         if (!txDigest) return;
 
-        const timestampCandidate = this.pickString(trade, ['timestampMs', 'timestamp', 'time', 'executedAt']);
+        // Extract timestamp
+        const timestampCandidate = this.pickString(trade, ['timestamp', 'timestampMs', 'time', 'executedAt']);
         const timestampFallback = this.pickNumber(trade, ['timestamp', 'timestampMs']);
         const timestamp = this.parseTimestamp(timestampCandidate ?? timestampFallback ?? Date.now());
 
-        const directionRaw = this.pickString(trade, ['direction', 'side', 'tradeSide']);
-        const direction = directionRaw?.toLowerCase();
-
-        const coinOutType = this.pickString(trade, ['outCoin.coinType', 'coinOut.coin_type', 'tokenOut.coinType']);
-        const coinInType = this.pickString(trade, ['inCoin.coinType', 'coinIn.coin_type', 'tokenIn.coinType']);
-
-        const normalizedOut = coinOutType?.toLowerCase();
-        const normalizedIn = coinInType?.toLowerCase();
-
-        let isSell = false;
-        if (direction === 'sell') {
-          isSell = true;
-        } else if (direction === 'buy') {
-          isSell = false;
-        } else if (normalizedIn && normalizedIn === normalizedTarget) {
-          isSell = true;
-        } else if (normalizedOut && normalizedOut === normalizedTarget) {
-          isSell = false;
-        } else if (normalizedIn?.includes(normalizedTarget)) {
-          isSell = true;
-        }
-
-        if (!isSell) return;
-
-        const walletAddress = this.pickString(trade, ['buyerAddress', 'senderAddress', 'address', 'owner', 'walletAddress']);
+        // Extract sender address
+        const walletAddress = this.pickString(trade, ['senderAddress', 'buyerAddress', 'address', 'owner', 'walletAddress']);
         if (!walletAddress) return;
 
-        let amountRaw: string | null = null;
-        let decimals: number | undefined = undefined;
+        // Check balanceChanges for negative amount of target token (indicates sell/transfer out)
+        const balanceChanges = trade.balanceChanges;
+        if (!Array.isArray(balanceChanges)) return;
 
-        if (normalizedIn === normalizedTarget) {
-          amountRaw = this.pickString(trade, ['inCoin.amount', 'amountIn', 'tokenInAmount', 'amount']);
-          decimals = this.pickNumber(trade, ['inCoin.decimals', 'decimalsIn', 'tokenInDecimals']);
-        } else {
-          amountRaw = this.pickString(trade, ['amount']);
-        }
+        // Find the balance change for the target token
+        const targetChange = balanceChanges.find((change: any) => {
+          const coinType = change.coinType?.toLowerCase() || '';
+          return coinType.includes(normalizedTarget);
+        });
 
-        if (!amountRaw) return;
+        if (!targetChange) return;
+
+        // Parse amount - negative means sell/transfer out
+        const amountStr = String(targetChange.amount || '0');
+        const amount = BigInt(amountStr);
+
+        // Skip if amount is positive (buy) or zero
+        if (amount >= 0n) return;
+
+        // Get absolute value for the sell amount
+        const amountRaw = (amount * -1n).toString();
 
         const eventKey = `${txDigest}:${timestamp}:${index}`;
 
@@ -462,8 +451,8 @@ export class SellDetector {
           timestamp,
           walletAddress,
           amountRaw,
-          coinType: coinInType || targetCoin,
-          decimals,
+          coinType: targetChange.coinType || targetCoin,
+          decimals: undefined, // Will be fetched later if needed
         });
       } catch (error) {
         logger.debug('Failed to normalize Blockberry sell trade', error);
