@@ -1181,17 +1181,18 @@ export class BuyDetector {
         return;
       }
 
-      const broadcastChannelId = process.env.BROADCAST_CHANNEL_ID;
-      if (!broadcastChannelId) {
-        logger.debug('No BROADCAST_CHANNEL_ID configured, skipping broadcast');
-        return;
-      }
-
       const raffle = await prisma.raffle.findUnique({
         where: { id: buyEvent.raffleId },
+        include: { project: true },
       });
 
       if (!raffle) {
+        return;
+      }
+
+      const broadcastChannelId = raffle.project?.broadcastChannelId;
+      if (!broadcastChannelId) {
+        logger.debug('No broadcastChannelId configured for project, skipping broadcast');
         return;
       }
 
@@ -1227,14 +1228,14 @@ export class BuyDetector {
       if (mediaUrl && mediaType) {
         if (mediaType === 'image') {
           try {
-            await bot.sendPhoto(broadcastChannelId, mediaUrl, {
+            await bot.sendPhoto(String(broadcastChannelId), mediaUrl, {
               caption: message,
               parse_mode: 'Markdown',
             });
           } catch (photoError: any) {
             if (photoError?.message?.includes('Document as Photo')) {
               logger.warn('Photo is actually a document, sending as document instead');
-              await bot.sendDocument(broadcastChannelId, mediaUrl, {
+              await bot.sendDocument(String(broadcastChannelId), mediaUrl, {
                 caption: message,
                 parse_mode: 'Markdown',
               });
@@ -1244,14 +1245,14 @@ export class BuyDetector {
           }
         } else if (mediaType === 'video') {
           try {
-            await bot.sendVideo(broadcastChannelId, mediaUrl, {
+            await bot.sendVideo(String(broadcastChannelId), mediaUrl, {
               caption: message,
               parse_mode: 'Markdown',
             });
           } catch (videoError: any) {
             if (videoError?.message?.includes('Document as Video')) {
               logger.warn('Video is actually a document, sending as document instead');
-              await bot.sendDocument(broadcastChannelId, mediaUrl, {
+              await bot.sendDocument(String(broadcastChannelId), mediaUrl, {
                 caption: message,
                 parse_mode: 'Markdown',
               });
@@ -1260,13 +1261,13 @@ export class BuyDetector {
             }
           }
         } else if (mediaType === 'gif') {
-          await bot.sendAnimation(broadcastChannelId, mediaUrl, {
+          await bot.sendAnimation(String(broadcastChannelId), mediaUrl, {
             caption: message,
             parse_mode: 'Markdown',
           });
         }
       } else {
-        await bot.sendMessage(broadcastChannelId, message, {
+        await bot.sendMessage(String(broadcastChannelId), message, {
           parse_mode: 'Markdown',
         });
       }

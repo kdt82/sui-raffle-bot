@@ -34,6 +34,7 @@ export function startStakeWorker(): Worker {
                 // Check if raffle is still active and winner hasn't been selected yet
                 const raffle = await prisma.raffle.findUnique({
                     where: { id: raffleId },
+                    include: { project: true },
                 });
 
                 if (!raffle) {
@@ -194,21 +195,21 @@ export function startStakeWorker(): Worker {
                         `🔗 Event ID: \`${stakeEventId}\``
                     );
 
-                    // Send public announcement to main chat for stakes
+                    // Send public announcement to broadcast channel for stakes
                     if (stakeType === 'stake') {
-                        const MAIN_CHAT_ID = process.env.MAIN_CHAT_ID;
-                        if (MAIN_CHAT_ID) {
+                        const broadcastChannelId = raffle.project?.broadcastChannelId;
+                        if (broadcastChannelId) {
                             try {
                                 const shortWallet = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
                                 await bot.sendMessage(
-                                    MAIN_CHAT_ID,
+                                    String(broadcastChannelId),
                                     `📢 **Staking Bonus Awarded!**\n\n` +
                                     `Wallet \`${shortWallet}\` has staked tokens on Moonbags.io!\n` +
                                     `🎟️ They have been awarded an additional **${actualAdjustment}** tickets in the raffle!`,
                                     { parse_mode: 'Markdown' }
                                 );
                             } catch (error) {
-                                logger.warn('Failed to send staking announcement to main chat:', error);
+                                logger.warn('Failed to send staking announcement to broadcast channel:', error);
                             }
                         }
                     }
