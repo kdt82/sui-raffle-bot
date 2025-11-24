@@ -1795,23 +1795,28 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
           ? `For every token you purchase, you'll receive **${ratio} raffle tickets**!`
           : `For every **${Math.round(1 / ratio).toLocaleString()} tokens** you purchase, you'll receive **1 raffle ticket**!`;
 
+        // Add staking bonus info if configured
+        const stakingBonusText = raffle.stakingBonusPercent
+          ? `\n🎁 **BONUS:** Stake your tokens to earn **${raffle.stakingBonusPercent}% extra tickets**!`
+          : '';
+
         const announcementMessage =
           `🎉 **A New Raffle Has Been Scheduled!** 🎉\n\n` +
           `💰 **Prize:**\n${prizeDisplay}\n\n` +
           `📅 **Start:** ${formatDate(raffle.startTime)} UTC\n` +
           `📅 **End:** ${formatDate(raffle.endTime)} UTC\n\n` +
           `📝 **Contract Address:**\n\`${raffle.ca}\`${minimumPurchaseText}\n\n` +
-          `🎟️ **Ticket Allocation:**\n${ticketExplanation}\n\n` +
+          `🎟️ **Ticket Allocation:**\n${ticketExplanation}${stakingBonusText}\n\n` +
           `🔗 **How to Enter:**\n` +
-          `1. Link your wallet: /linkwallet <address>\n` +
-          `2. Purchase tokens during raffle period\n` +
-          `3. Tickets allocated automatically\n\n` +
+          `1. Purchase tokens during raffle period\n` +
+          `2. Tickets allocated automatically\n` +
+          `3. Check your tickets with /mytickets\n\n` +
           `📱 **Commands:**\n` +
-          `/linkwallet - Link wallet\n` +
-          `/walletstatus - View linked wallet\n` +
+          `/mytickets - Check your ticket count\n` +
           `/leaderboard - See standings\n` +
-          `/unlinkwallet - Change wallet\n\n` +
-          `⚠️ **Must link wallet before buying to earn tickets!**\n` +
+          `/linkwallet - Link wallet (optional)\n` +
+          `/walletstatus - View linked wallet\n\n` +
+          `💡 **Tip:** Purchases are tracked automatically by wallet address.\n` +
           `Only purchases during raffle period count.\n\n` +
           `Good luck! 🍀`;
 
