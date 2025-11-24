@@ -61,12 +61,15 @@ export async function ensureProjectExists(msg: TelegramBot.Message): Promise<Pro
 
     const groupId = BigInt(msg.chat.id);
     const groupName = msg.chat.title || 'Unknown Group';
+    const userId = BigInt(msg.from!.id);
+    const username = msg.from?.username;
 
     try {
         let project = await prisma.project.findUnique({
             where: { telegramGroupId: groupId },
         });
 
+        let isNewProject = false;
         if (!project) {
             logger.info(`Creating new project for group ${groupName} (${groupId})`);
             project = await prisma.project.create({
@@ -80,6 +83,30 @@ export async function ensureProjectExists(msg: TelegramBot.Message): Promise<Pro
                     broadcastChannelId: groupId, // Default to same group
                 },
             });
+            isNewProject = true;
+        }
+
+        // Auto-promote the user who added the bot (or runs /start in a new group) as admin
+        if (isNewProject) {
+            const existingAdmin = await prisma.projectAdmin.findUnique({
+                where: {
+                    projectId_telegramUserId: {
+                        projectId: project.id,
+                        telegramUserId: userId,
+                    },
+                },
+            });
+
+            if (!existingAdmin) {
+                await prisma.projectAdmin.create({
+                    data: {
+                        projectId: project.id,
+                        telegramUserId: userId,
+                        permissions: 'super_admin', // First admin gets super_admin
+                    },
+                });
+                logger.info(`Auto-promoted user ${userId} (${username}) as super_admin of project ${project.id}`);
+            }
         }
 
         return {
