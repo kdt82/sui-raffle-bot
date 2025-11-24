@@ -75,7 +75,7 @@ export function startSellWorker(): Worker {
                 logger.info(`Tickets removed: ${actualRemoved} (requested ${ticketsRemoved}) for ${walletAddress}. New balance: ${newCount}`);
 
                 // Notify user if wallet is linked
-                const walletUser = await prisma.walletUser.findUnique({
+                const walletUser = await prisma.walletUser.findFirst({
                     where: { walletAddress },
                 });
 

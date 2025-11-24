@@ -66,7 +66,7 @@ export function startTicketWorker(): Worker {
         });
 
         // Notify user if wallet is linked (using enhanced notification service)
-        const walletUser = await prisma.walletUser.findUnique({
+        const walletUser = await prisma.walletUser.findFirst({
           where: { walletAddress },
         });
 

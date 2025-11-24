@@ -231,7 +231,7 @@ export class BackupService {
 
         const filepath = path.join(this.backupDir, file);
         const stats = await fs.stat(filepath);
-        
+
         // Parse backup ID and type from filename
         const match = file.match(/^(full|raffle|manual)_(.+)\.json$/);
         if (!match) continue;
@@ -325,7 +325,12 @@ export class BackupService {
           // Restore wallet users
           for (const user of data.walletUsers) {
             await prisma.walletUser.upsert({
-              where: { walletAddress: user.walletAddress },
+              where: {
+                projectId_walletAddress: {
+                  projectId: user.projectId,
+                  walletAddress: user.walletAddress
+                }
+              },
               create: user,
               update: user,
             });
@@ -411,7 +416,7 @@ export class BackupService {
       } else if (backup.metadata.type === 'raffle') {
         // Restore raffle backup
         const raffle = backup.data.raffle;
-        
+
         await prisma.raffle.upsert({
           where: { id: raffle.id },
           create: raffle,

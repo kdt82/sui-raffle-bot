@@ -1161,7 +1161,7 @@ export class BuyDetector {
 
   private async autoLinkWallet(walletAddress: string): Promise<void> {
     try {
-      const walletUser = await prisma.walletUser.findUnique({
+      const walletUser = await prisma.walletUser.findFirst({
         where: { walletAddress },
       });
 

@@ -156,7 +156,7 @@ export function startStakeWorker(): Worker {
                 logger.info(`${stakeType === 'stake' ? 'Added' : 'Removed'} ${actualAdjustment} bonus tickets for ${walletAddress}. New balance: ${newCount}`);
 
                 // Notify user if wallet is linked
-                const walletUser = await prisma.walletUser.findUnique({
+                const walletUser = await prisma.walletUser.findFirst({
                     where: { walletAddress },
                 });
 
