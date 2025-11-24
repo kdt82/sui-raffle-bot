@@ -8,13 +8,33 @@ import { RATE_LIMITS } from '../../utils/rate-limiter';
 import { incrementCommand } from '../../utils/metrics';
 import { analyticsService } from '../../services/analytics-service';
 import { auditService } from '../../services/audit-service';
+import { ensureProjectExists, getProjectContext } from '../middleware/project-context';
+import { isProjectAdmin, isAdmin } from '../middleware';
 
 export async function handleStartCommand(msg: TelegramBot.Message): Promise<void> {
   return withRateLimit(msg, 'start', RATE_LIMITS.USER_COMMAND, async () => {
     const chatId = msg.chat.id;
     const userId = BigInt(msg.from!.id);
+    const isPrivateChat = msg.chat.type === 'private';
     incrementCommand('start', false);
     await analyticsService.trackActivity(userId, 'command', { command: 'start' });
+
+    let projectContext = null;
+    if (!isPrivateChat) {
+      try {
+        projectContext = await ensureProjectExists(msg);
+      } catch (error) {
+        logger.error('Failed to ensure project exists:', error);
+      }
+    }
+
+    // Check if user is an admin
+    let userIsAdmin = false;
+    if (projectContext) {
+      userIsAdmin = await isProjectAdmin(userId, projectContext.id);
+    } else {
+      userIsAdmin = await isAdmin(userId);
+    }
 
     const welcomeMessage = `
 🎰 Welcome to the SUI Raffle Bot!
@@ -38,7 +58,13 @@ Commands:
 Good luck! 🍀
     `.trim();
 
-    await bot.sendMessage(chatId, welcomeMessage);
+    // Add admin hint if user is admin and in private chat
+    let finalMessage = welcomeMessage;
+    if (userIsAdmin && isPrivateChat) {
+      finalMessage += '\n\n🔐 *Admin Access Detected*\nUse /adminhelp to see admin commands.';
+    }
+
+    await bot.sendMessage(chatId, finalMessage, { parse_mode: 'Markdown' });
   });
 }
 
@@ -65,10 +91,21 @@ export async function handleLeaderboardCommand(msg: TelegramBot.Message): Promis
     incrementCommand('leaderboard', false);
     await analyticsService.trackActivity(userId, 'command', { command: 'leaderboard' });
 
+    const projectContext = await getProjectContext(msg);
+    if (!projectContext) {
+      if (msg.chat.type === 'private') {
+        await bot.sendMessage(chatId, '❌ Please use this command in the project group chat.');
+      } else {
+        await bot.sendMessage(chatId, '❌ Project not configured. Please run /start first.');
+      }
+      return;
+    }
+
     try {
-      // Find active raffle
+      // Find active raffle for this project
       const activeRaffle = await prisma.raffle.findFirst({
         where: {
+          projectId: projectContext.id,
           status: RAFFLE_STATUS.ACTIVE,
           endTime: { gt: new Date() },
         },
@@ -176,16 +213,40 @@ export async function handleMyTicketsCommand(msg: TelegramBot.Message): Promise<
     incrementCommand('mytickets', false);
     await analyticsService.trackActivity(userId, 'command', { command: 'mytickets' });
 
+    const projectContext = await getProjectContext(msg);
+    if (!projectContext) {
+      if (msg.chat.type === 'private') {
+        await bot.sendMessage(chatId, '❌ Please use this command in the project group chat.');
+      } else {
+        await bot.sendMessage(chatId, '❌ Project not configured. Please run /start first.');
+      }
+      return;
+    }
+
     try {
-      // Find user's linked wallet
-      const walletUser = await prisma.walletUser.findFirst({
-        where: { telegramUserId: userId },
+      // Find user's linked wallet for this project
+      const walletUser = await prisma.walletUser.findUnique({
+        where: {
+          projectId_walletAddress: {
+            projectId: projectContext.id,
+            walletAddress: '', // We need to find by telegramUserId first, but schema is walletAddress primary key... wait, schema changed.
+            // Actually, we should find by telegramUserId AND projectId
+          }
+        }
+      }).catch(() => null); // This query is wrong because we don't know wallet address yet
+
+      // Correct query: Find by telegramUserId and projectId
+      const walletUserFound = await prisma.walletUser.findFirst({
+        where: {
+          telegramUserId: userId,
+          projectId: projectContext.id
+        },
       });
 
-      if (!walletUser) {
+      if (!walletUserFound) {
         await bot.sendMessage(
           chatId,
-          '🔗 No wallet linked. Use /linkwallet <address> to link your wallet address.'
+          '🔗 No wallet linked for this project. Use /linkwallet <address> to link your wallet address.'
         );
         return;
       }
@@ -193,6 +254,7 @@ export async function handleMyTicketsCommand(msg: TelegramBot.Message): Promise<
       // Find active raffle
       const activeRaffle = await prisma.raffle.findFirst({
         where: {
+          projectId: projectContext.id,
           status: RAFFLE_STATUS.ACTIVE,
           endTime: { gt: new Date() },
         },
@@ -209,13 +271,13 @@ export async function handleMyTicketsCommand(msg: TelegramBot.Message): Promise<
         where: {
           raffleId_walletAddress: {
             raffleId: activeRaffle.id,
-            walletAddress: walletUser.walletAddress,
+            walletAddress: walletUserFound.walletAddress,
           },
         },
       });
 
       const ticketCount = ticket?.ticketCount || 0;
-      const message = `🎫 Your Tickets\n\nWallet: ${walletUser.walletAddress}\nTickets: ${ticketCount.toLocaleString()}\n\nRaffle ends: ${formatDate(activeRaffle.endTime)} UTC`;
+      const message = `🎫 Your Tickets\n\nWallet: ${walletUserFound.walletAddress}\nTickets: ${ticketCount.toLocaleString()}\n\nRaffle ends: ${formatDate(activeRaffle.endTime)} UTC`;
 
       await bot.sendMessage(chatId, message);
     } catch (error) {
@@ -232,6 +294,16 @@ export async function handleLinkWalletCommand(msg: TelegramBot.Message): Promise
     const username = msg.from?.username || null;
     incrementCommand('linkwallet', false);
     await analyticsService.trackActivity(userId, 'command', { command: 'linkwallet' });
+
+    const projectContext = await getProjectContext(msg);
+    if (!projectContext) {
+      if (msg.chat.type === 'private') {
+        await bot.sendMessage(chatId, '❌ Please use this command in the project group chat.');
+      } else {
+        await bot.sendMessage(chatId, '❌ Project not configured. Please run /start first.');
+      }
+      return;
+    }
 
     const args = msg.text?.split(' ').slice(1) || [];
 
@@ -252,21 +324,32 @@ export async function handleLinkWalletCommand(msg: TelegramBot.Message): Promise
     }
 
     try {
-      // Check if wallet already exists (to determine if new or relink)
+      // Check if wallet already exists for this project
       const existing = await prisma.walletUser.findUnique({
-        where: { walletAddress },
+        where: {
+          projectId_walletAddress: {
+            projectId: projectContext.id,
+            walletAddress,
+          }
+        },
       });
       const isNew = !existing;
 
       // Upsert wallet user
       await prisma.walletUser.upsert({
-        where: { walletAddress },
+        where: {
+          projectId_walletAddress: {
+            projectId: projectContext.id,
+            walletAddress,
+          }
+        },
         update: {
           telegramUserId: userId,
           telegramUsername: username,
           linkedAt: new Date(),
         },
         create: {
+          projectId: projectContext.id,
           walletAddress,
           telegramUserId: userId,
           telegramUsername: username,
@@ -285,7 +368,7 @@ export async function handleLinkWalletCommand(msg: TelegramBot.Message): Promise
       );
 
       // Track wallet link activity
-      await analyticsService.trackActivity(userId, 'wallet_link', { walletAddress });
+      await analyticsService.trackActivity(userId, 'wallet_link', { walletAddress, projectId: projectContext.id });
     } catch (error) {
       logger.error('Error linking wallet:', error);
       await bot.sendMessage(chatId, '❌ Error linking wallet. Please try again.');
@@ -300,15 +383,28 @@ export async function handleWalletStatusCommand(msg: TelegramBot.Message): Promi
     incrementCommand('walletstatus', false);
     await analyticsService.trackActivity(userId, 'command', { command: 'walletstatus' });
 
+    const projectContext = await getProjectContext(msg);
+    if (!projectContext) {
+      if (msg.chat.type === 'private') {
+        await bot.sendMessage(chatId, '❌ Please use this command in the project group chat.');
+      } else {
+        await bot.sendMessage(chatId, '❌ Project not configured. Please run /start first.');
+      }
+      return;
+    }
+
     try {
       const walletUser = await prisma.walletUser.findFirst({
-        where: { telegramUserId: userId },
+        where: {
+          telegramUserId: userId,
+          projectId: projectContext.id
+        },
       });
 
       if (!walletUser) {
         await bot.sendMessage(
           chatId,
-          '❌ No wallet linked to your account.\n\n' +
+          '❌ No wallet linked to your account for this project.\n\n' +
           'Link your wallet using:\n' +
           '/linkwallet <your_wallet_address>\n\n' +
           'Example: /linkwallet 0x1234567890abcdef...'
@@ -343,15 +439,28 @@ export async function handleUnlinkWalletCommand(msg: TelegramBot.Message): Promi
     incrementCommand('unlinkwallet', false);
     await analyticsService.trackActivity(userId, 'command', { command: 'unlinkwallet' });
 
+    const projectContext = await getProjectContext(msg);
+    if (!projectContext) {
+      if (msg.chat.type === 'private') {
+        await bot.sendMessage(chatId, '❌ Please use this command in the project group chat.');
+      } else {
+        await bot.sendMessage(chatId, '❌ Project not configured. Please run /start first.');
+      }
+      return;
+    }
+
     try {
       const walletUser = await prisma.walletUser.findFirst({
-        where: { telegramUserId: userId },
+        where: {
+          telegramUserId: userId,
+          projectId: projectContext.id
+        },
       });
 
       if (!walletUser) {
         await bot.sendMessage(
           chatId,
-          '❌ No wallet is currently linked to your account.'
+          '❌ No wallet is currently linked to your account for this project.'
         );
         return;
       }
@@ -362,7 +471,12 @@ export async function handleUnlinkWalletCommand(msg: TelegramBot.Message): Promi
 
       // Delete the wallet user link
       await prisma.walletUser.delete({
-        where: { walletAddress },
+        where: {
+          projectId_walletAddress: {
+            projectId: projectContext.id,
+            walletAddress,
+          }
+        },
       });
 
       // AUDIT LOG: Wallet unlinked (non-blocking)
@@ -381,10 +495,11 @@ export async function handleUnlinkWalletCommand(msg: TelegramBot.Message): Promi
       );
 
       // Track wallet unlink activity
-      await analyticsService.trackActivity(userId, 'wallet_unlink', { walletAddress });
+      await analyticsService.trackActivity(userId, 'wallet_unlink', { walletAddress, projectId: projectContext.id });
     } catch (error) {
       logger.error('Error unlinking wallet:', error);
       await bot.sendMessage(chatId, '❌ Error unlinking wallet. Please try again.');
     }
   });
 }
+

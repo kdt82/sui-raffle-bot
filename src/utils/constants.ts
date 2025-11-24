@@ -1,6 +1,6 @@
 export const DEFAULT_TICKETS_PER_TOKEN = 100;
-export const PRIZE_TYPES = ['USDC', 'AQUA', 'SUI'] as const;
-export type PrizeType = (typeof PRIZE_TYPES)[number];
+// PRIZE_TYPES are now dynamic per project
+export type PrizeType = string;
 
 export const DEX_OPTIONS = ['blockberry', 'cetus', 'turbos', '7kag', 'dexscreener', 'suidex', 'onchain'] as const;
 export type DexType = (typeof DEX_OPTIONS)[number];

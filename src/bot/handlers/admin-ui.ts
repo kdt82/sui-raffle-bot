@@ -2,9 +2,10 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
 import { prisma } from '../../utils/database';
 import { logger } from '../../utils/logger';
-import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX, getDexDisplayName, DexType, MAIN_CHAT_ID, formatDateShort, formatDate } from '../../utils/constants';
+import { RAFFLE_STATUS, MEDIA_TYPES, DEFAULT_DEX, getDexDisplayName, DexType, MAIN_CHAT_ID, formatDateShort, formatDate } from '../../utils/constants';
 import { conversationManager } from '../conversation';
 import { auditService } from '../../services/audit-service';
+import { getAdminProjectContext } from '../../middleware/project-context';
 
 // Helper function to extract token symbol from contract address
 // Example: 0xab954d078dab0a6727ce58388931850be4bdb6f72703ea3cad3d6eb0c12a0283::aqua::AQUA -> AQUA
@@ -30,9 +31,17 @@ export async function handleCreateRaffleUI(msg: TelegramBot.Message): Promise<vo
   const userId = BigInt(msg.from!.id);
   const username = msg.from?.username;
 
+  const projectContext = await getAdminProjectContext(msg);
+
+  if (!projectContext) {
+    await bot.sendMessage(chatId, '❌ Could not determine project context. Please use this command in the group chat or ensure you are an admin of a single project.');
+    return;
+  }
+
   // Check if there's already an active raffle
   const activeRaffle = await prisma.raffle.findFirst({
     where: {
+      projectId: projectContext.id,
       status: RAFFLE_STATUS.ACTIVE,
       endTime: { gt: new Date() },
     },
@@ -52,6 +61,7 @@ export async function handleCreateRaffleUI(msg: TelegramBot.Message): Promise<vo
   // Add admin info to conversation data
   conv.data.adminId = userId.toString();
   conv.data.adminUsername = username;
+  conv.data.projectId = projectContext.id;
 
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
@@ -83,25 +93,25 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
     return;
   }
 
+  const projectContext = await getAdminProjectContext(msg);
+  if (!projectContext) {
+    await bot.sendMessage(chatId, '❌ Could not determine project context. Please use this command in the group chat or ensure you are an admin of a single project.');
+    return;
+  }
+
   // Otherwise, use command mode with args
   if (args.length < 4) {
     await bot.sendMessage(
       chatId,
-      `?? Usage: /create_raffle <contract_address> <end_time> <prize_type> <prize_amount>\n\n` +
+      `📝 Usage: /create_raffle <contract_address> <end_time> <prize_type> <prize_amount>\n\n` +
       `Example: /create_raffle 0x123... 2024-12-31T23:59:59 SUI 1000\n\n` +
       `Or use /create_raffle without arguments for interactive mode.\n\n` +
-      `Prize types: ${PRIZE_TYPES.join(', ')}\n` +
       `End time format: YYYY-MM-DDTHH:mm:ss`
     );
     return;
   }
 
   const [ca, endTimeStr, prizeType, prizeAmount] = args;
-
-  if (!PRIZE_TYPES.includes(prizeType as any)) {
-    await bot.sendMessage(chatId, `❌ Invalid prize type. Must be one of: ${PRIZE_TYPES.join(', ')}`);
-    return;
-  }
 
   try {
     const endTime = new Date(endTimeStr);
@@ -118,6 +128,7 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
     // Check if there's already an active raffle
     const activeRaffle = await prisma.raffle.findFirst({
       where: {
+        projectId: projectContext.id,
         status: RAFFLE_STATUS.ACTIVE,
         endTime: { gt: new Date() },
       },
@@ -134,6 +145,7 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
 
     const raffle = await prisma.raffle.create({
       data: {
+        projectId: projectContext.id,
         ca,
         dex: DEFAULT_DEX,
         startTime: new Date(),
@@ -1698,6 +1710,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
 
     const raffle = await prisma.raffle.create({
       data: {
+        projectId: data.projectId,
         ca: data.contractAddress,
         dex: DEFAULT_DEX,
         startTime: startTime,

@@ -2,11 +2,12 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../index';
 import { prisma } from '../../utils/database';
 import { logger } from '../../utils/logger';
-import { PRIZE_TYPES, RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS, formatDate } from '../../utils/constants';
+import { RAFFLE_STATUS, MEDIA_TYPES, DEX_OPTIONS, formatDate } from '../../utils/constants';
 import { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
 import { conversationManager } from '../conversation';
 import { auditService } from '../../services/audit-service';
 import { notificationService } from '../../services/notification-service';
+import { getAdminProjectContext } from '../../middleware/project-context';
 
 // Re-export UI handler
 export { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
@@ -85,6 +86,12 @@ export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void
   const chatId = msg.chat.id;
   const userId = BigInt(msg.from!.id);
 
+  const projectContext = await getAdminProjectContext(msg);
+  if (!projectContext) {
+    await bot.sendMessage(chatId, '❌ Could not determine project context. Please use this command in the group chat or ensure you are an admin of a single project.');
+    return;
+  }
+
   try {
     // First check if there's an active conversation (raffle creation in progress)
     const conversation = conversationManager.getConversation(userId, chatId);
@@ -102,6 +109,7 @@ export async function handleCancelRaffle(msg: TelegramBot.Message): Promise<void
     // If no conversation, check for active raffle in database
     const activeRaffle = await prisma.raffle.findFirst({
       where: {
+        projectId: projectContext.id,
         status: RAFFLE_STATUS.ACTIVE,
       },
     });
@@ -163,7 +171,6 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
       `Example: /create_raffle 0x123... cetus 2024-12-31T23:59:59 SUI 1000\n\n` +
       `Or use /create_raffle without arguments for interactive mode.\n\n` +
       `DEX options: ${DEX_OPTIONS.join(', ')}\n` +
-      `Prize types: ${PRIZE_TYPES.join(', ')}\n` +
       `End time format: YYYY-MM-DDTHH:mm:ss`
     );
     return;
@@ -176,8 +183,9 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
     return;
   }
 
-  if (!PRIZE_TYPES.includes(prizeType as any)) {
-    await bot.sendMessage(chatId, `❌ Invalid prize type. Must be one of: ${PRIZE_TYPES.join(', ')}`);
+  const projectContext = await getAdminProjectContext(msg);
+  if (!projectContext) {
+    await bot.sendMessage(chatId, '❌ Could not determine project context. Please use this command in the group chat or ensure you are an admin of a single project.');
     return;
   }
 
@@ -196,6 +204,7 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
     // Check if there's already an active raffle
     const activeRaffle = await prisma.raffle.findFirst({
       where: {
+        projectId: projectContext.id,
         status: RAFFLE_STATUS.ACTIVE,
         endTime: { gt: new Date() },
       },
@@ -212,6 +221,7 @@ export async function handleCreateRaffle(msg: TelegramBot.Message): Promise<void
 
     const raffle = await prisma.raffle.create({
       data: {
+        projectId: projectContext.id,
         ca,
         dex: dex.toLowerCase(),
         startTime: new Date(),
@@ -245,18 +255,12 @@ export async function handleSetPrize(msg: TelegramBot.Message): Promise<void> {
     await bot.sendMessage(
       chatId,
       `📝 Usage: /set_prize <prize_type> <prize_amount>\n\n` +
-      `Example: /set_prize USDC 500\n\n` +
-      `Prize types: ${PRIZE_TYPES.join(', ')}`
+      `Example: /set_prize USDC 500`
     );
     return;
   }
 
   const [prizeType, prizeAmount] = args;
-
-  if (!PRIZE_TYPES.includes(prizeType as any)) {
-    await bot.sendMessage(chatId, `❌ Invalid prize type. Must be one of: ${PRIZE_TYPES.join(', ')}`);
-    return;
-  }
 
   try {
     const activeRaffle = await prisma.raffle.findFirst({
@@ -853,101 +857,40 @@ export async function handleConfig(msg: TelegramBot.Message): Promise<void> {
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
-          select: {
-            tickets: true,
-            buyEvents: true,
-          },
-        },
-      },
-    }).catch((err) => {
-      logger.error('Prisma query error in config:', err);
-      throw new Error('Database query failed - schema might be out of sync');
+          select: { tickets: true }
+        }
+      }
     });
 
     if (!activeRaffle) {
-      await bot.sendMessage(chatId, '📭 No active raffle found.');
+      await bot.sendMessage(chatId, 'ℹ️ No active raffle found.');
       return;
     }
 
-    const totalTickets = await prisma.ticket.aggregate({
+    const ticketCount = await prisma.ticket.aggregate({
       where: { raffleId: activeRaffle.id },
       _sum: { ticketCount: true },
-    }).catch((err) => {
-      logger.error('Prisma aggregate error in config:', err);
-      return { _sum: { ticketCount: 0 } };
     });
 
-    const minimumText = activeRaffle.minimumPurchase
-      ? `Minimum Purchase: ${activeRaffle.minimumPurchase} tokens`
-      : 'Minimum Purchase: None (all purchases earn tickets)';
+    const totalTickets = ticketCount._sum.ticketCount || 0;
 
-    const configMessage = `⚙️ **Raffle Configuration**\n\n` +
-      `**ID:** \`${activeRaffle.id}\`\n` +
-      `**Contract Address:** \`${activeRaffle.ca}\`\n` +
-      `**DEX:** ${activeRaffle.dex.toUpperCase()}\n` +
-      `**Start Time:** ${activeRaffle.startTime.toLocaleString()}\n` +
-      `**End Time:** ${activeRaffle.endTime.toLocaleString()}\n` +
-      `**Prize:** ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}\n` +
-      `**${minimumText}**\n` +
-      `**Status:** ${activeRaffle.status}\n\n` +
-      `📊 **Statistics:**\n` +
-      `• Total Buy Events: ${activeRaffle._count.buyEvents}\n` +
-      `• Total Tickets: ${totalTickets._sum.ticketCount || 0}\n` +
-      `• Unique Wallets: ${activeRaffle._count.tickets}\n\n` +
-      `🔧 **Available Commands:**\n` +
-      `• \`/set_prize <type> <amount>\` - Change prize\n` +
-      `• \`/set_minimum_purchase <amount>\` - Change minimum (0 to remove)\n` +
-      `• \`/upload_media\` - Add/change raffle media\n` +
-      `• \`/reset_tickets\` - Reset all tickets (testing only)\n` +
-      `• \`/award_prize\` - Mark prize as awarded`;
-
-    await bot.sendMessage(chatId, configMessage, { parse_mode: 'Markdown' });
-  } catch (error) {
-    logger.error('Error fetching config:', error);
-
-    // Provide more detailed error message
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     await bot.sendMessage(
       chatId,
-      `❌ Error fetching configuration.\n\n` +
-      `This usually means the database schema needs to be updated.\n` +
-      `The bot is redeploying now - please try again in 2-3 minutes.\n\n` +
-      `Error: ${errorMsg}`
+      `⚙️ **Current Raffle Configuration**\n\n` +
+      `ID: \`${activeRaffle.id}\`\n` +
+      `Contract: \`${activeRaffle.ca}\`\n` +
+      `DEX: ${activeRaffle.dex.toUpperCase()}\n` +
+      `Status: ${activeRaffle.status}\n` +
+      `Prize: ${activeRaffle.prizeAmount} ${activeRaffle.prizeType}\n` +
+      `Start: ${formatDate(activeRaffle.startTime)}\n` +
+      `End: ${formatDate(activeRaffle.endTime)}\n` +
+      `Participants: ${activeRaffle._count.tickets}\n` +
+      `Total Tickets: ${totalTickets.toLocaleString()}`,
+      { parse_mode: 'Markdown' }
     );
-  }
-}
-
-export async function handleChatInfo(msg: TelegramBot.Message): Promise<void> {
-  const chatId = msg.chat.id;
-
-  try {
-    // Get chat information
-    const chat = msg.chat;
-    const chatType = chat.type;
-    const chatTitle = chat.title || 'N/A';
-    const chatUsername = (chat as any).username ? `@${(chat as any).username}` : 'N/A';
-
-    // Log to server for easy copy-paste
-    logger.info(`📍 CHAT INFO - ID: ${chatId}, Type: ${chatType}, Title: ${chatTitle}, Username: ${chatUsername}`);
-
-    const infoMessage =
-      `📍 **Chat Information** 📍\n\n` +
-      `**Chat ID:** \`${chatId}\`\n` +
-      `**Chat Type:** \`${chatType}\`\n` +
-      `**Title:** \`${chatTitle}\`\n` +
-      `**Username:** \`${chatUsername}\`\n\n` +
-      `💡 **To use this chat for broadcast notifications:**\n` +
-      `1. Add this variable to Railway:\n` +
-      `   \`BROADCAST_CHANNEL_ID=${chatId}\`\n` +
-      `2. Restart the service\n` +
-      `3. Buy notifications will appear here!\n\n` +
-      `_Note: Make sure the bot is an admin if this is a channel._`;
-
-    await bot.sendMessage(chatId, infoMessage, { parse_mode: 'Markdown' });
-    logger.info(`Admin requested chat info for ${chatId}`);
   } catch (error) {
-    logger.error('Error fetching chat info:', error);
-    await bot.sendMessage(chatId, '❌ Failed to fetch chat information. Please try again.');
+    logger.error('Error fetching config:', error);
+    await bot.sendMessage(chatId, '❌ Error fetching configuration.');
   }
 }
 
@@ -955,24 +898,20 @@ export async function handleResetTickets(msg: TelegramBot.Message): Promise<void
   const chatId = msg.chat.id;
 
   try {
-    // Find active raffle
     const activeRaffle = await prisma.raffle.findFirst({
       where: {
         status: RAFFLE_STATUS.ACTIVE,
-      },
-      include: {
-        tickets: true,
-        buyEvents: true,
+        endTime: { gt: new Date() },
       },
     });
 
     if (!activeRaffle) {
-      await bot.sendMessage(chatId, '❌ No active raffle found to reset tickets.');
+      await bot.sendMessage(chatId, '❌ No active raffle found.');
       return;
     }
 
-    const ticketCount = activeRaffle.tickets.length;
-    const buyEventCount = activeRaffle.buyEvents.length;
+    const ticketCount = activeRaffle.tickets?.length || 0;
+    const buyEventCount = activeRaffle.buyEvents?.length || 0;
 
     // Delete all tickets for this raffle
     await prisma.ticket.deleteMany({
@@ -987,8 +926,8 @@ export async function handleResetTickets(msg: TelegramBot.Message): Promise<void
     await bot.sendMessage(
       chatId,
       `✅ *Tickets Reset Successfully!*\n\n` +
-      `🎫 Deleted ${ticketCount} ticket records\n` +
-      `📊 Deleted ${buyEventCount} buy events\n\n` +
+      `🎫 Deleted tickets\n` +
+      `📊 Deleted buy events\n\n` +
       `Raffle ID: \`${activeRaffle.id}\`\n` +
       `Contract: \`${activeRaffle.ca.slice(0, 10)}...${activeRaffle.ca.slice(-6)}\`\n` +
       `DEX: ${activeRaffle.dex.toUpperCase()}\n\n` +
@@ -996,7 +935,7 @@ export async function handleResetTickets(msg: TelegramBot.Message): Promise<void
       { parse_mode: 'Markdown' }
     );
 
-    logger.info(`Admin reset tickets for raffle: ${activeRaffle.id} (${ticketCount} tickets, ${buyEventCount} events)`);
+    logger.info(`Admin reset tickets for raffle: ${activeRaffle.id}`);
   } catch (error) {
     logger.error('Error resetting tickets:', error);
     await bot.sendMessage(chatId, '❌ Failed to reset tickets. Please try again.');

@@ -49,6 +49,16 @@ export async function handleAdminHelpCommand(msg: TelegramBot.Message): Promise<
   • Remove tickets from a wallet (uses active raffle)
   • Example: /remove\\_tickets 0x123... 500
 
+/verify\\_stake <tx>
+  • Manually verify a staking transaction and add bonus tickets
+  • Checks the transaction block and processes staking action
+  • Example: /verify\\_stake A1B2C3D4E5F6...
+
+/verify\\_sell <tx>
+  • Manually verify a sell/transfer transaction and remove tickets
+  • Checks the transaction block and processes sell action
+  • Example: /verify\\_sell A1B2C3D4E5F6...
+
 /reset\\_tickets <raffleId>
   • Reset all tickets for a raffle to zero
   • ⚠️ Use with caution!
@@ -93,7 +103,7 @@ export async function handleAdminHelpCommand(msg: TelegramBot.Message): Promise<
 
 💡 *Note:* Wallet linking removed - all wallets with tickets automatically eligible
 🔐 *Randomness:* Winners selected using SUI on-chain randomness (verifiable)
-📝 Commands can be used in private chat or admin group
+📝 *Admin commands must be used in private chat with the bot*
     `.trim();
 
     await bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
@@ -182,7 +192,7 @@ export async function handleWalletListCommand(msg: TelegramBot.Message): Promise
       logger.error('Error fetching wallet list:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await bot.sendMessage(
-        chatId, 
+        chatId,
         `❌ Error fetching wallet list: ${errorMessage}\n\nPlease check the logs and try again.`
       );
     }

@@ -10,8 +10,45 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+model Project {
+  id                String   @id @default(cuid())
+  telegramGroupId   BigInt   @unique  // The Telegram group/channel ID
+  telegramGroupName String?             // Group name for reference
+  broadcastChannelId BigInt?           // Where to post announcements (can be same as group)
+  contractAddress   String              // Token contract address to monitor
+  tokenName         String   @default("Token") // e.g. "AQUA"
+  tokenSymbol       String   @default("TKN")   // e.g. "$AQUA"
+  dex               String   @default("cetus") // Default DEX for this project
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  raffles           Raffle[]
+  admins            ProjectAdmin[]
+  walletUsers       WalletUser[]
+  
+  @@index([telegramGroupId])
+}
+
+model ProjectAdmin {
+  id             String   @id @default(cuid())
+  projectId      String
+  telegramUserId BigInt
+  permissions    String   @default("admin") // admin, super_admin
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, telegramUserId])
+  @@index([projectId])
+  @@index([telegramUserId])
+}
+
 model Raffle {
   id          String   @id @default(cuid())
+  projectId   String   // Link to project
   ca          String   // Contract address to monitor
   dex         String   // DEX name: cetus, turbos, 7kag, dexscreener, suidex
   startTime   DateTime @default(now())
@@ -36,12 +73,16 @@ model Raffle {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   tickets   Ticket[]
   buyEvents BuyEvent[]
   sellEvents SellEvent[]
   stakeEvents StakeEvent[]
   winners   Winner[]
 
+  @@index([projectId])
+  @@index([projectId, status])
   @@index([status])
   @@index([endTime])
   @@index([startTime])
@@ -123,16 +164,23 @@ model StakeEvent {
 
 
 model WalletUser {
-  walletAddress   String   @id
+  id              String   @id @default(cuid())
+  projectId       String
+  walletAddress   String
   telegramUserId  BigInt
   telegramUsername String?
   verified        Boolean  @default(false)
   linkedAt        DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, walletAddress])
+  @@index([projectId, telegramUserId])
   @@index([telegramUserId])
 }
 
+// Deprecated: Global Admin model (replaced by ProjectAdmin)
 model Admin {
   id             String   @id @default(cuid())
   telegramUserId BigInt   @unique

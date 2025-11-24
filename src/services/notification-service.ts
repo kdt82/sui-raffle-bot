@@ -210,6 +210,7 @@ Check your tickets: /mytickets
         include: {
           winners: true,
           tickets: true,
+          project: true,
         },
       });
 
@@ -231,36 +232,41 @@ Check your tickets: /mytickets
       // Format ticket count with commas
       const ticketCountFormatted = Number(winner.ticketCount).toLocaleString();
 
-      // Build the message using the AQUA template
+      const tokenName = raffle.project?.tokenName || 'Token';
+      const tokenSymbol = raffle.project?.tokenSymbol || 'TKN';
+
+      // Build the message using dynamic template
       const message = `
-� AQUA RAFFLE — WINNER CONFIRMED! 🌊
+🎉 ${tokenName.toUpperCase()} RAFFLE — WINNER CONFIRMED! 🌊
 
-The tides have settled and the prize has officially been marked AWARDED. Thanks to everyone who dove in for this round!
+The raffle has ended and the prize has officially been marked AWARDED. Thanks to everyone who participated!
 
-� Prize: ${raffle.prizeAmount} ${raffle.prizeType}
+💰 Prize: ${raffle.prizeAmount} ${raffle.prizeType}
 🏷 Raffle ID: ${raffle.id}
 
 🏆 WINNER:
 ${winner.walletAddress}
-� Tickets: ${ticketCountFormatted}${winningTicketText}
+🎟 Tickets: ${ticketCountFormatted}${winningTicketText}
 
-� Transaction:
+🔗 Transaction:
 https://suiscan.xyz/mainnet/tx/${txHash}
 
 Hash: ${txHash}
 
 Prize has been delivered and the winner announced on the broadcast channel.
-More waves coming soon… stay hydrated, stay ready. 🌊🐾
+More raffles coming soon… stay tuned! 🚀
 
-#AQUAonSUI #SuiNetwork
+#${tokenSymbol}onSUI #SuiNetwork
       `.trim();
 
-      // Broadcast to main channel only (no individual DMs)
-      const broadcastChannelId = process.env.MAIN_CHAT_ID;
+      // Broadcast to project's broadcast channel
+      // Fallback to MAIN_CHAT_ID if not set in project (though it should be)
+      const broadcastChannelId = raffle.project?.broadcastChannelId?.toString() || process.env.MAIN_CHAT_ID;
+
       if (broadcastChannelId) {
         try {
           await bot.sendMessage(broadcastChannelId, message);
-          logger.info(`Broadcasted winner announcement to channel for raffle ${raffleId}`);
+          logger.info(`Broadcasted winner announcement to channel ${broadcastChannelId} for raffle ${raffleId}`);
         } catch (error) {
           logger.error(`Failed to broadcast winner announcement to channel:`, error);
         }
@@ -409,7 +415,7 @@ More waves coming soon… stay hydrated, stay ready. 🌊🐾
       for (const notification of dueNotifications) {
         try {
           await this.processNotification(notification);
-          
+
           await prisma.scheduledNotification.update({
             where: { id: notification.id },
             data: {
@@ -488,4 +494,3 @@ More waves coming soon… stay hydrated, stay ready. 🌊🐾
 
 // Singleton instance
 export const notificationService = new NotificationService();
-
