@@ -48,9 +48,14 @@ export async function startRaffle(raffleId: string): Promise<void> {
 
     const bonusPercent = raffle.stakingBonusPercent || 25;
 
+    // Use custom prize description if available, otherwise use standard format
+    const prizeDisplay = raffle.prizeDescription
+      ? raffle.prizeDescription
+      : `${raffle.prizeAmount} ${raffle.prizeType}`;
+
     const startMessage =
       `🎉 **A New Raffle Has Started** 🎉\n\n` +
-      `💰 **Prize:** ${raffle.prizeAmount} ${raffle.prizeType}\n\n` +
+      `💰 **Prize:**\n${prizeDisplay}\n\n` +
       `📅 **Start:** ${formatDate(raffle.startTime || new Date())} UTC\n` +
       `📅 **End:** ${formatDate(raffle.endTime)} UTC\n\n` +
       `📝 **Contract Address:**\n\`${raffle.ca}\`\n\n` +

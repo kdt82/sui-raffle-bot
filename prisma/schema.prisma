@@ -18,6 +18,7 @@ model Raffle {
   endTime     DateTime
   prizeType   String   // USDC, AQUA, or SUI
   prizeAmount String   // Amount as string to handle decimals
+  prizeDescription String? // Optional custom prize description (multi-line, for milestone prizes etc.)
   minimumPurchase String? // Minimum token purchase to earn tickets
   ticketsPerToken String? @default("100") // Tickets awarded per token (e.g., "100" or "0.0002" for 1 ticket per 5000 tokens)
   mediaUrl    String?  // Telegram file ID or URL (deprecated - use specific fields below)

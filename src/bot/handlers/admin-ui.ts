@@ -437,14 +437,26 @@ async function handlePrizeTypeStep(msg: TelegramBot.Message, data: Record<string
 async function handlePrizeAmountStep(msg: TelegramBot.Message, data: Record<string, any>): Promise<void> {
   const chatId = msg.chat.id;
   const userId = BigInt(msg.from!.id);
-  const prizeAmount = msg.text?.trim();
+  const prizeInput = msg.text?.trim();
 
-  if (!prizeAmount || isNaN(parseFloat(prizeAmount)) || parseFloat(prizeAmount) <= 0) {
-    await bot.sendMessage(chatId, '❌ Please send a valid prize amount (number greater than 0).');
+  if (!prizeInput) {
+    await bot.sendMessage(chatId, '❌ Please send a prize amount or description.');
     return;
   }
 
-  data.prizeAmount = prizeAmount;
+  // Check if it's a simple number (exact amount)
+  const isNumeric = !isNaN(parseFloat(prizeInput)) && parseFloat(prizeInput) > 0 && !prizeInput.includes('\n');
+
+  if (isNumeric) {
+    // Store as exact amount
+    data.prizeAmount = prizeInput;
+    data.prizeDescription = null;
+  } else {
+    // Store as custom description
+    data.prizeAmount = 'Custom'; // Placeholder for database
+    data.prizeDescription = prizeInput;
+  }
+
   conversationManager.updateConversation(userId, chatId, {
     step: 'create_raffle_ticket_ratio',
     data,
@@ -457,9 +469,13 @@ async function handlePrizeAmountStep(msg: TelegramBot.Message, data: Record<stri
     ],
   };
 
+  const prizeDisplayShort = isNumeric
+    ? `${prizeInput} ${data.prizeType}`
+    : prizeInput.split('\n')[0] + (prizeInput.includes('\n') ? '...' : '');
+
   await bot.sendMessage(
     chatId,
-    `✅ Prize Amount: ${prizeAmount}\n\n` +
+    `✅ Prize: ${prizeDisplayShort}\n\n` +
     `Step 6/11: Ticket Ratio\n\n` +
     `Set how many tickets are earned per token purchased.\n\n` +
     `**Format Options:**\n` +
@@ -945,13 +961,17 @@ async function showReviewStep(chatId: number, data: Record<string, any>): Promis
     ? `\nStaking Bonus: 🎁 ${data.stakingBonusPercent}% bonus tickets`
     : '\nStaking Bonus: None';
 
+  // Format prize display
+  const prizeDisplay = data.prizeDescription
+    ? data.prizeDescription
+    : `${data.prizeAmount} ${data.prizeType}`;
+
   await bot.sendMessage(
     chatId,
     `📋 **Review Raffle Details**\n\n` +
     `Contract Address: \`${data.contractAddress}\`\n` +
     `DEX: ${dexDisplay}\n` +
-    `Prize Type: ${data.prizeType}\n` +
-    `Prize Amount: ${data.prizeAmount}\n` +
+    `Prize:\n${prizeDisplay}\n` +
     `Ticket Ratio: ${ratioDisplay}${minimumText}${announcementMediaText}${notificationMediaText}${leaderboardMediaText}${stakingBonusText}${randomnessTypeText}\n\n` +
     `Please review and confirm:`,
     {
@@ -1004,10 +1024,20 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
       await bot.editMessageText(
         `✅ Prize Type: ${prizeType}\n\n` +
         `Step 5/11: Prize Amount\n\n` +
-        `Please send the prize amount:`,
+        `Send the prize amount or custom description.\n\n` +
+        `**Option 1 - Exact Amount:**\n` +
+        `Send a number like: \`500\`\n` +
+        `Will display as: "500 ${prizeType}"\n\n` +
+        `**Option 2 - Custom Description:**\n` +
+        `Send custom text (can be multi-line for milestones):\n` +
+        `\`Reach 10K Market Cap - 100 ${prizeType}\n` +
+        `Reach 15K Market Cap - 150 ${prizeType}\n` +
+        `Reach 20K Market Cap - 250 ${prizeType}\`\n\n` +
+        `Send your prize amount or description:`,
         {
           chat_id: chatId,
           message_id: query.message!.message_id,
+          parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
               [{ text: '🔙 Back', callback_data: 'back_to_prize_type' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
@@ -1674,6 +1704,7 @@ async function createRaffleFromData(chatId: number, data: Record<string, any>): 
         endTime: new Date(data.endTime),
         prizeType: data.prizeType,
         prizeAmount: data.prizeAmount,
+        prizeDescription: data.prizeDescription || null,
         ticketsPerToken: data.ticketsPerToken || '100',
         minimumPurchase: data.minimumPurchase || null,
         mediaUrl: data.mediaUrl || null,  // Deprecated, kept for backwards compatibility
