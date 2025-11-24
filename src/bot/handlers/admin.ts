@@ -11,6 +11,7 @@ import { notificationService } from '../../services/notification-service';
 // Re-export UI handler
 export { handleCreateRaffleUI, handleCreateRaffleStep } from './admin-ui';
 import { stakeDetector } from '../../blockchain/stake-detector';
+import { sellDetector } from '../../blockchain/sell-detector';
 import { MAIN_CHAT_ID } from '../../utils/constants';
 
 export async function handleVerifyStakeCommand(msg: TelegramBot.Message): Promise<void> {
@@ -50,6 +51,32 @@ export async function handleVerifyStakeCommand(msg: TelegramBot.Message): Promis
     }
   } catch (error: any) {
     logger.error('Error verifying stake:', error);
+    await bot.sendMessage(chatId, `❌ Error: ${error.message}`);
+  }
+}
+
+export async function handleVerifySellCommand(msg: TelegramBot.Message): Promise<void> {
+  const chatId = msg.chat.id;
+  const args = msg.text?.split(' ').slice(1) || [];
+
+  if (args.length === 0) {
+    await bot.sendMessage(chatId, '📝 Usage: /verify_sell <tx_hash>');
+    return;
+  }
+
+  const txHash = args[0].trim();
+  await bot.sendMessage(chatId, `🔍 Verifying sell transaction: ${txHash}...`);
+
+  try {
+    const result = await sellDetector.verifyAndProcessSell(txHash);
+
+    if (result.success) {
+      await bot.sendMessage(chatId, `✅ Success: ${result.message}`);
+    } else {
+      await bot.sendMessage(chatId, `❌ Verification Failed: ${result.message}`);
+    }
+  } catch (error: any) {
+    logger.error('Error verifying sell:', error);
     await bot.sendMessage(chatId, `❌ Error: ${error.message}`);
   }
 }

@@ -264,10 +264,6 @@ export class SellDetector {
           continue;
         }
 
-        // Removed DEX check to capture ALL outgoing transfers (robustness)
-        // const isDexSwap = await this.isTransferFromDexSwap(client, txDigest);
-        // if (!isDexSwap) { ... }
-
         const sender = await this.getTransactionSender(client, txDigest);
         if (!sender) {
           this.processedEventIds.add(eventKey);
@@ -375,14 +371,8 @@ export class SellDetector {
           decimals = await this.getCoinDecimals(suiClient, trade.coinType);
         }
 
-        // Removed DEX check to capture ALL outgoing transfers
-        // if (!suiClient) suiClient = getSuiClient();
-        // const isDexSwap = await this.isTransferFromDexSwap(suiClient, trade.txDigest);
-        // if (!isDexSwap) { ... }
-
         const tokenAmount = this.formatAmount(trade.amountRaw, decimals);
 
-        // Use eventKey as transactionHash to ensure uniqueness per trade/event
         const sellEvent: SellEventData = {
           walletAddress: trade.walletAddress,
           tokenAmount,
@@ -425,7 +415,6 @@ export class SellDetector {
         const timestampFallback = this.pickNumber(trade, ['timestamp', 'timestampMs']);
         const timestamp = this.parseTimestamp(timestampCandidate ?? timestampFallback ?? Date.now());
 
-        // Check direction
         const directionRaw = this.pickString(trade, ['direction', 'side', 'tradeSide']);
         const direction = directionRaw?.toLowerCase();
 
@@ -441,10 +430,8 @@ export class SellDetector {
         } else if (direction === 'buy') {
           isSell = false;
         } else if (normalizedIn && normalizedIn === normalizedTarget) {
-          // If Input is Target, I am giving Target, so I am Selling
           isSell = true;
         } else if (normalizedOut && normalizedOut === normalizedTarget) {
-          // If Output is Target, I am receiving Target, so I am Buying
           isSell = false;
         } else if (normalizedIn?.includes(normalizedTarget)) {
           isSell = true;
@@ -495,6 +482,132 @@ export class SellDetector {
       return tx.transaction?.data.sender ?? null;
     } catch (e) {
       return null;
+    }
+  }
+
+  public async verifyAndProcessSell(txHash: string): Promise<{ success: boolean; message: string; ticketsRemoved?: number; wallet?: string }> {
+    if (!this.activeRaffle) {
+      return { success: false, message: 'No active raffle' };
+    }
+
+    const client = getSuiClient();
+    try {
+      const tx = await client.getTransactionBlock({
+        digest: txHash,
+        options: {
+          showBalanceChanges: true,
+          showEffects: true
+        }
+      });
+
+      if (!tx.balanceChanges || tx.balanceChanges.length === 0) {
+        return { success: false, message: 'No balance changes found in transaction' };
+      }
+
+      const normalizedRaffleCA = this.activeRaffle.ca.toLowerCase().replace(/^0x/, '');
+
+      const sellChange = tx.balanceChanges.find(change => {
+        const coinType = change.coinType.toLowerCase().replace(/^0x/, '');
+        return coinType.includes(normalizedRaffleCA) && BigInt(change.amount) < 0n;
+      });
+
+      if (!sellChange) {
+        return { success: false, message: `No sell (negative balance change) found for token ${this.activeRaffle.ca}` };
+      }
+
+      let walletAddress = '';
+      const owner = sellChange.owner as any;
+      if (owner && typeof owner === 'object' && 'AddressOwner' in owner) {
+        walletAddress = owner.AddressOwner;
+      } else {
+        return { success: false, message: 'Sell owner is not a wallet address' };
+      }
+
+      if (!walletAddress.startsWith('0x')) {
+        walletAddress = '0x' + walletAddress;
+      }
+
+      const amountAbs = BigInt(sellChange.amount) * -1n;
+
+      const timestamp = parseInt(tx.timestampMs || '0') || Date.now();
+
+      let decimals = 9;
+      if (this.decimalsCache.has(this.activeRaffle.ca)) {
+        decimals = this.decimalsCache.get(this.activeRaffle.ca)!;
+      } else {
+        try {
+          const metadata = await client.getCoinMetadata({ coinType: this.activeRaffle.ca });
+          if (metadata?.decimals) {
+            decimals = metadata.decimals;
+            this.decimalsCache.set(this.activeRaffle.ca, decimals);
+          }
+        } catch (e) {
+          logger.warn('Failed to fetch decimals in verify sell', e);
+        }
+      }
+
+      const eventData: SellEventData = {
+        walletAddress,
+        tokenAmount: amountAbs.toString(),
+        transactionHash: txHash,
+        timestamp: new Date(timestamp),
+        rawAmount: amountAbs.toString(),
+        decimals
+      };
+
+      const ticketsRemoved = this.calculateTicketRemoval(eventData);
+
+      const existing = await prisma.sellEvent.findUnique({
+        where: { transactionHash: txHash }
+      });
+
+      if (existing) {
+        if (existing.ticketsRemoved < ticketsRemoved) {
+          await prisma.sellEvent.update({
+            where: { id: existing.id },
+            data: { ticketsRemoved }
+          });
+
+          const diff = ticketsRemoved - existing.ticketsRemoved;
+
+          const queue = getSellEventsQueue();
+          await queue.add('remove-tickets', {
+            sellEventId: existing.id,
+            raffleId: existing.raffleId,
+            walletAddress: existing.walletAddress,
+            ticketsRemoved: diff
+          });
+
+          return { success: true, message: `Updated sell event. Removed additional ${diff} tickets (Total: ${ticketsRemoved}).`, ticketsRemoved: diff, wallet: walletAddress };
+        }
+        return { success: false, message: `Sell event already processed with ${existing.ticketsRemoved} tickets removed.` };
+      } else {
+        const sellEvent = await prisma.sellEvent.create({
+          data: {
+            raffleId: this.activeRaffle.id,
+            walletAddress: eventData.walletAddress,
+            tokenAmount: eventData.tokenAmount,
+            ticketsRemoved,
+            transactionHash: eventData.transactionHash,
+            timestamp: eventData.timestamp,
+            processed: false,
+          },
+        });
+
+        const queue = getSellEventsQueue();
+        await queue.add('remove-tickets', {
+          sellEventId: sellEvent.id,
+          raffleId: sellEvent.raffleId,
+          walletAddress: sellEvent.walletAddress,
+          ticketsRemoved: sellEvent.ticketsRemoved,
+        });
+
+        return { success: true, message: `Processed new sell event. Removed ${ticketsRemoved} tickets.`, ticketsRemoved, wallet: walletAddress };
+      }
+
+    } catch (error: any) {
+      logger.error('Error verifying sell:', error);
+      return { success: false, message: `Error: ${error.message}` };
     }
   }
 
