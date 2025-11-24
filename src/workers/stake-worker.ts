@@ -79,13 +79,59 @@ export function startStakeWorker(): Worker {
                 let actualAdjustment: number;
 
                 if (stakeType === 'stake') {
-                    // Add bonus tickets
-                    newCount = currentCount + ticketsAdjusted;
-                    actualAdjustment = ticketsAdjusted;
+                    // Add bonus tickets based on CURRENT ticket count (eligible tokens)
+                    // This ensures bonus is only calculated on tokens bought during raffle
+                    const bonusPercent = raffle.stakingBonusPercent || 25;
+                    const bonusTickets = Math.floor(currentCount * (bonusPercent / 100));
+
+                    newCount = currentCount + bonusTickets;
+                    actualAdjustment = bonusTickets;
                 } else {
-                    // Remove bonus tickets, but don't go below 0
-                    newCount = Math.max(0, currentCount - ticketsAdjusted);
-                    actualAdjustment = currentCount - newCount;
+                    // UNSTAKE: Remove bonus tickets proportionally
+                    // Calculate what percentage of total staked amount is being unstaked
+
+                    // Get all stake events for this wallet in this raffle
+                    const allStakeEvents = await prisma.stakeEvent.findMany({
+                        where: {
+                            raffleId,
+                            walletAddress,
+                            processed: true,
+                        },
+                        orderBy: { timestamp: 'asc' },
+                    });
+
+                    // Calculate total staked and total unstaked amounts
+                    let totalStaked = 0n;
+                    let totalUnstaked = 0n;
+                    let totalBonusAwarded = 0;
+
+                    for (const evt of allStakeEvents) {
+                        if (evt.stakeType === 'stake') {
+                            totalStaked += BigInt(evt.tokenAmount);
+                            totalBonusAwarded += evt.ticketsAdjusted;
+                        } else {
+                            totalUnstaked += BigInt(evt.tokenAmount);
+                        }
+                    }
+
+                    // Current staked balance (before this unstake)
+                    const currentStaked = totalStaked - totalUnstaked;
+
+                    if (currentStaked <= 0n) {
+                        // Nothing staked, remove all bonus tickets
+                        actualAdjustment = ticketsAdjusted;
+                        newCount = Math.max(0, currentCount - actualAdjustment);
+                    } else {
+                        // Calculate proportional bonus to remove
+                        const unstakeAmount = BigInt(tokenAmount);
+                        const proportionUnstaked = Number(unstakeAmount * 10000n / currentStaked) / 10000; // Use basis points for precision
+
+                        // Remove proportional amount of total bonus tickets awarded
+                        const bonusToRemove = Math.floor(totalBonusAwarded * proportionUnstaked);
+
+                        actualAdjustment = bonusToRemove;
+                        newCount = Math.max(0, currentCount - bonusToRemove);
+                    }
                 }
 
                 // Update ticket record
