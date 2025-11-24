@@ -11,6 +11,7 @@ import { handleAdminHelpCommand, handleWalletListCommand } from './help';
 import { requireAdmin, requireAdminCallback, requireAdminPrivate, requireAdminPrivateCallback } from '../middleware';
 import { conversationManager } from '../conversation';
 import { withCallbackRateLimit } from '../rate-limit-middleware';
+import { handleBotAddedToGroup, handleBotStatusChange } from './group-events';
 
 export function registerUserHandlers(): void {
   bot.onText(/\/start/, async (msg) => {
@@ -90,6 +91,24 @@ export function registerUserHandlers(): void {
       await handleNotificationsTime(msg);
     } catch (error) {
       logger.error('Error handling /notifications_time command:', error);
+    }
+  });
+
+  // Handle bot being added to a group
+  bot.on('new_chat_members', async (msg) => {
+    try {
+      await handleBotAddedToGroup(msg);
+    } catch (error) {
+      logger.error('Error handling new_chat_members event:', error);
+    }
+  });
+
+  // Handle bot status changes (e.g., promoted to admin)
+  bot.on('my_chat_member', async (msg) => {
+    try {
+      await handleBotStatusChange(msg);
+    } catch (error) {
+      logger.error('Error handling my_chat_member event:', error);
     }
   });
 }
