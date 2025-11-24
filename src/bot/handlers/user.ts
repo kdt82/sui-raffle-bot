@@ -8,7 +8,7 @@ import { RATE_LIMITS } from '../../utils/rate-limiter';
 import { incrementCommand } from '../../utils/metrics';
 import { analyticsService } from '../../services/analytics-service';
 import { auditService } from '../../services/audit-service';
-import { ensureProjectExists, getProjectContext } from '../middleware/project-context';
+import { ensureProjectExists, getProjectContext } from '../../middleware/project-context';
 import { isProjectAdmin, isAdmin } from '../middleware';
 
 export async function handleStartCommand(msg: TelegramBot.Message): Promise<void> {

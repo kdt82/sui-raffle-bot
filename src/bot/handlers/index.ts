@@ -1,7 +1,7 @@
 import { bot } from '../index';
 import { logger } from '../../utils/logger';
 import { handleStartCommand, handleLeaderboardCommand, handleMyTicketsCommand, handleLinkWalletCommand, handleWalletStatusCommand, handleUnlinkWalletCommand, handleMyIdCommand } from './user';
-import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleSelectWinner, handleConfig, handleCancelRaffle, handleChatInfo, handleResetTickets, handleAddTickets, handleRemoveTickets, handleBackfillTicketNumber, handleStartRaffle, handleEndRaffle, handleVerifyStakeCommand, handleVerifySellCommand } from './admin';
+import { handleCreateRaffle, handleSetPrize, handleSetMinimumPurchase, handleUploadMedia, handleAwardPrize, handleShowWinner, handleSelectWinner, handleConfig, handleCancelRaffle, handleResetTickets, handleAddTickets, handleRemoveTickets, handleBackfillTicketNumber, handleStartRaffle, handleEndRaffle, handleVerifyStakeCommand, handleVerifySellCommand } from './admin';
 import { handleCreateRaffleCallback, handleCreateRaffleStep } from './admin-ui';
 import { handleNotificationsCommand, handleNotificationsToggle, handleNotificationsTime } from './notifications';
 import { handleAnalyticsCommand, handleAnalyticsRafflesCommand, handleAnalyticsExportCommand, handleAnalyticsLiveCommand } from './analytics';
@@ -279,15 +279,15 @@ export function registerAdminHandlers(): void {
     });
   });
 
-  bot.onText(/\/chatinfo/, async (msg) => {
-    await requireAdmin(msg, async () => {
-      try {
-        await handleChatInfo(msg);
-      } catch (error) {
-        logger.error('Error handling /chatinfo command:', error);
-      }
-    });
-  });
+  // bot.onText(/\/chatinfo/, async (msg) => {
+  //   await requireAdmin(msg, async () => {
+  //     try {
+  //       await handleChatInfo(msg);
+  //     } catch (error) {
+  //       logger.error('Error handling /chatinfo command:', error);
+  //     }
+  //   });
+  // });
 
   bot.onText(/\/analytics$/, async (msg) => {
     await requireAdminPrivate(msg, async () => {

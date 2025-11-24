@@ -903,6 +903,10 @@ export async function handleResetTickets(msg: TelegramBot.Message): Promise<void
         status: RAFFLE_STATUS.ACTIVE,
         endTime: { gt: new Date() },
       },
+      include: {
+        tickets: true,
+        buyEvents: true,
+      },
     });
 
     if (!activeRaffle) {
