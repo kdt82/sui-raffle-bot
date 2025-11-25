@@ -879,7 +879,7 @@ async function handleLeaderboardMediaStep(msg: TelegramBot.Message, data: Record
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
       [{ text: '25%', callback_data: 'staking_bonus_25' }, { text: '50%', callback_data: 'staking_bonus_50' }],
-      [{ text: '57%', callback_data: 'staking_bonus_57' }, { text: '✏️ Custom', callback_data: 'staking_bonus_custom' }],
+      [{ text: '75%', callback_data: 'staking_bonus_75' }, { text: '✏️ Custom', callback_data: 'staking_bonus_custom' }],
       [{ text: '⏭️ Skip (No Bonus)', callback_data: 'skip_staking_bonus' }],
       [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
     ],
@@ -1235,7 +1235,7 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
           reply_markup: {
             inline_keyboard: [
               [{ text: '25%', callback_data: 'staking_bonus_25' }, { text: '50%', callback_data: 'staking_bonus_50' }],
-              [{ text: '57%', callback_data: 'staking_bonus_57' }, { text: '✏️ Custom', callback_data: 'staking_bonus_custom' }],
+              [{ text: '75%', callback_data: 'staking_bonus_75' }, { text: '✏️ Custom', callback_data: 'staking_bonus_custom' }],
               [{ text: '⏭️ Skip (No Bonus)', callback_data: 'skip_staking_bonus' }],
               [{ text: '🔙 Back', callback_data: 'back_to_leaderboard_media' }, { text: '❌ Cancel', callback_data: 'cancel_create_raffle' }],
             ],
@@ -1246,8 +1246,8 @@ export async function handleCreateRaffleCallback(query: TelegramBot.CallbackQuer
     }
 
     // Handle staking bonus selection
-    if (callbackData === 'staking_bonus_25' || callbackData === 'staking_bonus_50' || callbackData === 'staking_bonus_57') {
-      const bonusPercent = callbackData === 'staking_bonus_25' ? 25 : callbackData === 'staking_bonus_50' ? 50 : 57;
+    if (callbackData === 'staking_bonus_25' || callbackData === 'staking_bonus_50' || callbackData === 'staking_bonus_75') {
+      const bonusPercent = callbackData === 'staking_bonus_25' ? 25 : callbackData === 'staking_bonus_50' ? 50 : 75;
       conversation.data.stakingBonusPercent = bonusPercent;
       conversation.data.randomnessType = 'client-side'; // Default to client-side
 
